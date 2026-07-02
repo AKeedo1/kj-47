@@ -152,7 +152,7 @@ input{font-family:inherit}
 .chart__bar.is-on{background:var(--acc)}
 .chart__lbl{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
 
-/* consistency dots row (sessions over recent weeks) */
+/* consistency grid — squares, one per session over recent weeks */
 .weeks{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .weeks__cell{width:13px;height:13px;border-radius:3px;background:var(--line-soft);border:1px solid var(--line)}
 .weeks__cell.l1{background:color-mix(in srgb,var(--acc) 40%,var(--line))}
@@ -175,12 +175,15 @@ input{font-family:inherit}
 .pgbest__v{font-family:var(--display);font-weight:300;font-size:34px}
 .pgbest__v small{font-family:var(--serif);font-size:12px;color:var(--mut);margin-left:5px}
 .pgbest__l{font-size:11px;letter-spacing:.04em;color:var(--mut)}
+.bw__goal{margin-top:8px;font-size:12px;letter-spacing:.02em;color:var(--acc);opacity:.85}
 .pglink{margin-top:16px;width:100%;text-align:left;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 0}
 
 /* rank ladder (secondary reference) */
 .ladder{display:flex;flex-direction:column;gap:2px;margin-top:4px}
 .ladder__row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line-soft)}
 .ladder__row.is-cur .ladder__n{color:var(--acc)}
+.ladder__row.is-peak .ladder__n{color:var(--fg-soft)}
+.ladder__row.is-peak .ladder__p{color:var(--acc);opacity:.8}
 .ladder__n{font-family:var(--serif);font-size:14px;color:var(--mut)}
 .ladder__p{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
 
@@ -212,7 +215,7 @@ input{font-family:inherit}
 .shead__day{font-family:var(--display);font-weight:300;font-size:34px;line-height:1;margin-top:6px}
 .shead__sub{font-size:13px;color:var(--mut);margin-top:8px}
 
-/* deload selector */
+/* feel selector — "how does it feel" */
 .feel{margin-top:26px}
 .feel__opts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
 .feel__opt{padding:13px 6px;border:1px solid var(--line);border-radius:14px;text-align:center;

@@ -44,7 +44,6 @@
     const list = drills.map(d => `<li>${d}</li>`).join("");
     return `<p class="warm__aero">${aero}</p><ul class="warm__list">${list}</ul><p class="warm__cue">${WARMUP.flatfeet}</p>${cue ? `<p class="warm__cue" style="color:var(--acc)">${cue}</p>` : ""}`;
   }
-  const DAY_LABELS = { monday: "Monday", wednesday: "Wednesday", saturday: "Saturday" };
   const CREW = ["Faisal", "Yazan"];
   const TIERS = [
     { n: "Bronze", min: 0 }, { n: "Iron", min: 300 }, { n: "Steel", min: 800 },
@@ -80,7 +79,7 @@
   };
 
   // ---------- store ----------
-  const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0 });
+  const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0, bwGoal: null });
   function load() {
     try { const r = localStorage.getItem(KEY); const s = r ? JSON.parse(r) : blank(); s.sessions = s.sessions || {}; return s; }
     catch (e) { return blank(); }
@@ -110,11 +109,6 @@
     return "saturday"; // Thu/Fri -> Sat
   }
   function isTrainingDay() { const d = new Date().getDay(); return d === 1 || d === 3 || d === 6; }
-  function nextDayLabel() {
-    const d = new Date().getDay();
-    if (d === 0 || d === 1) return "Monday"; if (d === 2 || d === 3) return "Wednesday";
-    return "Saturday";
-  }
   // ---------- session rotation (calendar-independent flexibility) ----------
   const ROTATION = ["monday", "wednesday", "saturday"];
   const DAY_SHORT = { monday: "Lower", wednesday: "Upper", saturday: "Hinge" };
@@ -253,14 +247,30 @@
     const headline = bw.length > 1
       ? `<div class="pgbest"><span class="pgbest__v">${fmtN(Math.abs(delta))}<small>kg ${delta <= 0 ? "down" : "up"}</small></span><span class="pgbest__l">${fmtN(latest.kg)} kg now · since ${fmtDate(first.date)}</span></div>`
       : `<div class="pgbest"><span class="pgbest__v">${fmtN(latest.kg)}<small>kg</small></span><span class="pgbest__l">${fmtDate(latest.date)}</span></div>`;
+    const goal = store.bwGoal;
+    const toGo = goal ? Math.round((latest.kg - goal) * 10) / 10 : null;
+    const goalLine = goal
+      ? `<p class="bw__goal">${toGo > 0 ? `${fmtN(toGo)} kg to go · goal ${fmtN(goal)} kg` : `Goal reached — ${fmtN(goal)} kg`}</p>`
+      : "";
     return `<div class="section"><div class="section__head"><span class="section__title">Bodyweight</span></div>
       ${headline}
+      ${goalLine}
       ${bw.length > 1 ? lineChart(bw.map(x => x.kg)) : ""}
       <button class="btn btn--ghost" id="log-bw" style="margin-top:14px">Log weight</button><div id="bw-form" hidden style="margin-top:12px"></div>
+      <button class="pglink" id="bw-goal">${goal ? "Edit goal weight" : "Set a goal weight"}</button>
       <button class="pglink" id="bw-edit">Edit entries</button></div>`;
   }
   function wireBodyweight() {
     const eb = document.getElementById("bw-edit"); if (eb) eb.addEventListener("click", () => go({ name: "bwEdit", back: { name: "home" } }));
+    const gb = document.getElementById("bw-goal");
+    if (gb) gb.addEventListener("click", () => {
+      const raw = prompt("Goal weight in kg (leave blank to clear):", store.bwGoal ? String(store.bwGoal) : "");
+      if (raw === null) return;
+      if (raw.trim() === "") { store.bwGoal = null; save(store); render(); return; }
+      const v = parseFloat(raw);
+      if (!v || v < 30 || v > 400) { alert("Enter a weight between 30 and 400 kg."); return; }
+      store.bwGoal = v; save(store); render();
+    });
     const btn = document.getElementById("log-bw"); if (!btn) return;
     btn.addEventListener("click", () => {
       const box = document.getElementById("bw-form"), bw = store.bodyweight || [];
@@ -318,7 +328,7 @@
 
     if (d.sessions === 0 && !resume && !(store.bodyweight || []).length) { renderHomeZero(startDay, startTitle); return; }
 
-    const nextLine = isTrainingDay() ? "Today" : `Next session · ${nextDayLabel()}`;
+    const nextLine = resume ? "In progress" : `Next up · ${DAY_SHORT[startDay]}`;
     const cells = d.weeks.map(w => {
       const lv = w.sess >= 3 ? "l3" : w.sess === 2 ? "l2" : w.sess === 1 ? "l1" : "";
       return Array.from({ length: 3 }, (_, i) => `<span class="weeks__cell ${i < w.sess ? lv : ""}"></span>`).join("");
@@ -388,14 +398,14 @@
       <div class="section">
         <div class="section__head"><span class="section__title">Rank ladder</span></div>
         <div class="ladder">
-          ${TIERS.map(t => `<div class="ladder__row ${t.n === d.cur.n ? "is-cur" : ""}"><span class="ladder__n">${t.n}</span><span class="ladder__p">${t.min} pts</span></div>`).join("")}
+          ${TIERS.map((t, i) => { const isPeak = i === store.bestRankIdx && store.bestRankIdx > d.tierIdx; return `<div class="ladder__row ${t.n === d.cur.n ? "is-cur" : ""} ${isPeak ? "is-peak" : ""}"><span class="ladder__n">${t.n}</span><span class="ladder__p">${isPeak ? "peak · " : ""}${t.min} pts</span></div>`; }).join("")}
         </div>
       </div>
 
       ${recent.length ? `<div class="section">
         <div class="section__head"><span class="section__title">Recent sessions</span><span class="section__aside">tap to edit</span></div>
         <div class="hist">
-          ${recent.map(h => `<button class="hist__row" data-editkey="${h.key}"><span class="hist__day">${DAY_LABELS[h.day] || h.day}</span><span class="hist__meta">${fmtDate(h.date)} · ${h.sets} sets · ${fmtVol(h.vol)} kg</span></button>`).join("")}
+          ${recent.map(h => `<button class="hist__row" data-editkey="${h.key}"><span class="hist__day">${DAY_SHORT[h.day] || h.day}</span><span class="hist__meta">${fmtDate(h.date)} · ${h.sets} sets · ${fmtVol(h.vol)} kg</span></button>`).join("")}
         </div>
       </div>` : ""}
 
@@ -415,7 +425,7 @@
 
   function renderHomeZero(day, title) {
     screen.innerHTML = `
-      <div class="home__top"><span class="home__brand">Cairn</span><span class="kicker">${isTrainingDay() ? "Today" : "Next · " + nextDayLabel()}</span></div>
+      <div class="home__top"><span class="home__brand">Cairn</span><span class="kicker">Next up · ${DAY_SHORT[day]}</span></div>
       <div class="zero">
         <p class="kicker">Rank</p>
         <h1 class="rank__tier">Bronze</h1>
@@ -492,7 +502,7 @@
           const last = lastPerformance(store, exId);
           const lastStr = last ? "Last: " + last.map(x => `${fmtN(x.weight)}×${x.reps}`).join(", ") : "First time";
           const flagged = session.feel === "joints" && session.joint && (JOINT_LOAD[session.joint] || []).includes(exId);
-          const scheme = st.completed ? '<span class="excard__check">done</span>' : `${ex.sets} × ${st.rxReps || ex.reps}${st.rxWeight ? " · " + st.rxWeight + " kg" : ""}`;
+          const scheme = st.completed ? '<span class="excard__check">done</span>' : schemeLine(ex, st);
           return `<button class="excard ${st.completed ? "is-done" : ""}" data-ex="${i}">
             <div class="excard__top"><span class="excard__name">${lib.name}${exId !== ex.id ? ' <span class="sw">swap</span>' : ""}</span><span class="excard__scheme">${scheme}</span></div>
             <div class="excard__last">${lastStr}</div>
@@ -565,7 +575,7 @@
       </div>
       ${p.reason ? `<p class="coach">${p.reason}</p>` : ""}
       ${s.length ? `<div class="section"><div class="section__head"><span class="section__title">Every session</span><span class="section__aside">${s.length}</span></div>
-        <div class="hist">${s.slice().reverse().map(x => `<div class="hist__row" style="cursor:default"><span class="hist__day">${DAY_LABELS[x.day] || fmtDate(x.date)}</span><span class="hist__meta">${fmtDate(x.date)} · ${x.sets.map(z => `${fmtN(z.weight)}×${z.reps}`).join(", ")}</span></div>`).join("")}</div>
+        <div class="hist">${s.slice().reverse().map(x => `<div class="hist__row" style="cursor:default"><span class="hist__day">${DAY_SHORT[x.day] || fmtDate(x.date)}</span><span class="hist__meta">${fmtDate(x.date)} · ${x.sets.map(z => `${fmtN(z.weight)}×${z.reps}`).join(", ")}</span></div>`).join("")}</div>
       </div>` : ""}
     `;
     document.getElementById("pg-back").addEventListener("click", () => history.back());
@@ -585,7 +595,7 @@
         <span class="setrow__n">Set ${i + 1}</span>
         <span class="stepper"><button class="stepper__b" data-w="-2.5">&minus;</button><input class="stepper__f" inputmode="decimal" value="${set.weight}" data-f="weight"><span class="stepper__u">kg</span><button class="stepper__b" data-w="2.5">+</button></span>
         <span class="stepper"><button class="stepper__b" data-r="-1">&minus;</button><input class="stepper__f" inputmode="numeric" value="${set.reps}" data-f="reps"><span class="stepper__u">rep</span><button class="stepper__b" data-r="1">+</button></span>
-        <button class="setrow__log ${set.done ? "" : "is-off"}">${set.done ? "logged" : "off"}</button>`;
+        <button class="setrow__log ${set.done ? "" : "is-off"}">${set.done ? "Done" : "Off"}</button>`;
       const wIn = row.querySelector('[data-f="weight"]'), rIn = row.querySelector('[data-f="reps"]');
       row.querySelectorAll("[data-w]").forEach(b => b.addEventListener("click", () => { wIn.value = Math.max(0, (parseFloat(wIn.value) || 0) + parseFloat(b.dataset.w)); set.weight = wIn.value; saveEdit(key); }));
       row.querySelectorAll("[data-r]").forEach(b => b.addEventListener("click", () => { rIn.value = Math.max(0, (parseInt(rIn.value, 10) || 0) + parseInt(b.dataset.r, 10)); set.reps = String(rIn.value); saveEdit(key); }));
@@ -649,6 +659,9 @@
         <button class="feel__opt ${store.remind ? "is-sel" : ""}" id="remind-toggle" style="width:auto;padding:11px 20px;margin-top:12px">${store.remind ? "On" : "Off"}</button>
         <p class="feel__note">iOS can't wake a web app in the background yet, so this pings you when you open the app on a training day. A true morning alert needs a server — on the roadmap.</p>
       </div>
+      <div class="section"><p class="section__title">How Cairn works</p>
+        <p class="feel__note" style="margin-top:10px;line-height:1.6">Your rank is your <b>current form</b> — your last eight weeks of training plus the weight you've dropped. Keep both moving to hold it; stop and it fades, but your peak stays on record. Each logged set is 10 points, a personal best 40, and every kilo lost 150.</p>
+      </div>
       <div class="section"><p class="section__title">Data</p>
         <button class="btn btn--ghost" id="s-export" style="margin-top:12px">Back up data</button>
         <button class="btn btn--ghost" id="s-restore" style="margin-top:10px">Restore from a backup</button>
@@ -693,7 +706,7 @@
       <p class="demo__cap">${lib.videoTitle || "Form demo"}</p>
 
       <div class="exmeta">
-        <div class="exmeta__row"><span class="exmeta__l">Today</span><span class="exmeta__v">${ex.sets} × ${st.rxReps || ex.reps}${st.rxWeight ? " · " + st.rxWeight + " kg" : " · " + ex.target}</span></div>
+        <div class="exmeta__row"><span class="exmeta__l">Today</span><span class="exmeta__v">${schemeLine(ex, st)}${(!st.rxWeight && ex.id !== "bike_finisher") ? " · " + ex.target : ""}</span></div>
         <div class="exmeta__row"><span class="exmeta__l">Last time</span><span class="exmeta__v">${last ? last.map(x => `${fmtN(x.weight)}×${x.reps}`).join(", ") : "First time — log honest."}</span></div>
       </div>
 
@@ -733,7 +746,7 @@
           <span class="stepper__u">rep</span>
           <button class="stepper__b" data-r="1">+</button>
         </span>
-        <button class="setrow__log">${set.done ? "set" : "Log"}</button>`;
+        <button class="setrow__log">${set.done ? "Done" : "Log"}</button>`;
       const wIn = row.querySelector('[data-f="weight"]'), rIn = row.querySelector('[data-f="reps"]');
       row.querySelectorAll("[data-w]").forEach(b => b.addEventListener("click", () => { wIn.value = Math.max(0, (parseFloat(wIn.value) || 0) + parseFloat(b.dataset.w)); set.weight = wIn.value; persist(day); }));
       row.querySelectorAll("[data-r]").forEach(b => b.addEventListener("click", () => { rIn.value = Math.max(0, (parseInt(rIn.value, 10) || 0) + parseInt(b.dataset.r, 10)); set.reps = String(rIn.value); persist(day); }));
@@ -805,6 +818,7 @@
     const feeler = guided.setIdx === 0;
     const total = prog.exercises.length;
     const frac = (guided.exIdx + guided.setIdx / Math.max(1, ex.sets)) / total;
+    const repLabel = ex.id === "bike_finisher" ? ex.reps : (/each side|paces/i.test(ex.reps) ? ex.reps : (st.rxReps || ex.reps) + " reps");
 
     screen.innerHTML = `
       <div class="guided">
@@ -815,7 +829,7 @@
         <div class="gdemo" id="g-demo" hidden></div>
         <div class="gset">
           ${feeler ? `<p class="gfeeler">Feeler set — ramp up, lighter</p>` : ""}
-          <p class="gset__lbl">Set ${guided.setIdx + 1} of ${ex.sets} · target ${st.rxReps || ex.reps} reps</p>
+          <p class="gset__lbl">Set ${guided.setIdx + 1} of ${ex.sets} · target ${repLabel}</p>
           ${!feeler && st.reason ? `<p class="coach" style="text-align:center;max-width:32ch;margin:0 auto 14px">${st.reason}</p>` : ""}
           <div class="ginputs">
             <div class="ginput"><div class="ginput__row"><button class="ginput__b" data-gw="-2.5">&minus;</button><span class="ul-fx" id="g-ulw"><input class="ginput__f" id="g-weight" inputmode="decimal" value="${set.weight}"></span><button class="ginput__b" data-gw="2.5">+</button></div><span class="ginput__u">kg</span></div>
@@ -889,14 +903,15 @@
     const crewLine = inCount === 2 ? "All three of you showed up." : inCount === 1 ? `${CREW.find(c => session.crew[c])} showed up with you.` : "Solo today — still counts.";
     const fwd = d.next ? `${Math.max(0, d.next.min - d.points)} points to ${d.next.n}` : "Apex reached";
     const weekLine = d.thisWeek >= 3 ? "Full week — three of three." : `${d.thisWeek} of 3 this week.`;
+    const nextFocus = DAY_SHORT[ROTATION[(ROTATION.indexOf(day) + 1) % ROTATION.length]] || "your next session";
 
     screen.innerHTML = `
       <div class="finish">
         <img class="brandmark" src="icons/cairn-outline.png" alt="" />
-        <p class="finish__k">${prog.title.split(" — ")[0]} · ${DAY_LABELS[day] || day}</p>
+        <p class="finish__k">${prog.title.split(" — ")[0]}</p>
         <h1 class="finish__h">Done.</h1>
         <p class="finish__sub">${sets} sets logged. ${crewLine}</p>
-        <p class="finish__sub" style="margin-top:6px">${weekLine} ${nextDayLabel()} gets you closer — ${fwd}.</p>
+        <p class="finish__sub" style="margin-top:6px">${weekLine} Next up, ${nextFocus} — ${fwd}.</p>
         <div class="finish__stat">
           <div><div class="v">${fmtVol(vol)}</div><div class="u">Kg this session</div></div>
           <div><div class="v">${d.cur.n}</div><div class="u">Rank</div></div>
@@ -917,6 +932,12 @@
 
   // ---------- helpers ----------
   function effId(session, idx, ex) { return (session.swaps && session.swaps[idx]) || ex.id; }
+  // Scheme text for a card/detail — cardio shows its time, per-side moves keep "each side", lifts show reps × kg.
+  function schemeLine(ex, st) {
+    if (ex.id === "bike_finisher") return ex.reps;
+    const reps = /each side|paces/i.test(ex.reps) ? ex.reps : (st.rxReps || ex.reps);
+    return `${ex.sets} × ${reps}${st.rxWeight ? " · " + st.rxWeight + " kg" : ""}`;
+  }
   // ---- progression engine (Marcus's brain) ----
   function programWeek() { if (!store.started) return 1; const d = Math.floor((Date.now() - new Date(store.started).getTime()) / 86400000); return Math.min(6, Math.max(1, Math.floor(d / 7) + 1)); }
   function startWeight(exId, ex) { return (typeof STARTING_WEIGHTS !== "undefined" && STARTING_WEIGHTS[exId]) || parseTargetKg(ex.target) || 0; }
