@@ -124,6 +124,8 @@ input{font-family:inherit}
 .rank__pts{font-size:11px;letter-spacing:.04em;color:var(--mut)}
 .rank__next{font-size:11px;letter-spacing:.04em;color:var(--mut)}
 .rank__next b{color:var(--acc);font-weight:400}
+.rank__peak{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-top:8px;opacity:.85}
+.rank__break{font-size:11px;letter-spacing:.02em;color:var(--mut);margin-top:8px}
 
 /* start CTA card */
 .start{margin-top:28px}

@@ -80,7 +80,7 @@
   };
 
   // ---------- store ----------
-  const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [] });
+  const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0 });
   function load() {
     try { const r = localStorage.getItem(KEY); const s = r ? JSON.parse(r) : blank(); s.sessions = s.sessions || {}; return s; }
     catch (e) { return blank(); }
@@ -137,27 +137,38 @@
   const doneSets = (sess) => Object.values(sess.exercises || {}).flatMap(e => (e.sets || []).filter(st => st.done));
   const isDone = (sess) => doneSets(sess).length > 0;
 
+  const SCORE_WINDOW_DAYS = 56;   // rank counts your last ~8 weeks of training; older sessions age out (current form)
+  const BW_RATE = 150;            // score points per kg lost from baseline weigh-in
   function derive(s) {
     const all = Object.values(s.sessions || {}).filter(isDone)
       .sort((a, b) => new Date(a.date) - new Date(b.date));
-    const prMax = {}, bestEver = {}; let totalVol = 0, totalSets = 0, prCount = 0;
+    const prMax = {}, bestEver = {}; let totalVol = 0, totalSets = 0, prCount = 0, winSets = 0, winPR = 0;
+    const cutoff = Date.now() - SCORE_WINDOW_DAYS * 86400000;
     const sessionStats = [];
     all.forEach(se => {
+      const inWin = new Date(se.date).getTime() >= cutoff;
       let sv = 0;
       Object.keys(se.exercises || {}).forEach(exId => {
         (se.exercises[exId].sets || []).forEach(st => {
           if (!st.done) return;
           const w = +st.weight || 0, r = +st.reps || 0; if (w <= 0 && r <= 0) return;
           totalSets++; totalVol += w * r; sv += w * r;
+          if (inWin) winSets++;
           const e = epley(w, r);
           if (!bestEver[exId] || e > bestEver[exId].e1rm) bestEver[exId] = { exId, weight: w, reps: r, e1rm: e, date: se.date };
-          if (!prMax[exId]) prMax[exId] = e;                                 // first-ever seeds silently, no points
-          else if (e > prMax[exId] + 0.01) { prMax[exId] = e; prCount++; }   // only genuine improvements score
+          if (!prMax[exId]) prMax[exId] = e;                                                     // first-ever seeds silently
+          else if (e > prMax[exId] + 0.01) { prMax[exId] = e; prCount++; if (inWin) winPR++; }   // genuine improvement scores
         });
       });
       sessionStats.push({ date: se.date, day: se.day, volume: sv, sets: doneSets(se).length });
     });
-    const points = totalSets * 10 + prCount * 40;
+    const trainingPoints = winSets * 10 + winPR * 40;   // current form — decays as sessions age past the window
+    // condition — weight lost from your first logged weigh-in; regain gives these points back
+    const bw = s.bodyweight || [];
+    const bwBase = bw.length ? bw[0].kg : null, bwNow = bw.length ? bw[bw.length - 1].kg : null;
+    const kgLost = bw.length ? Math.max(0, bwBase - bwNow) : 0;
+    const conditionPoints = Math.round(kgLost * BW_RATE);
+    const points = trainingPoints + conditionPoints;
     let ti = 0; TIERS.forEach((t, i) => { if (points >= t.min) ti = i; });
     const cur = TIERS[ti], next = TIERS[ti + 1] || null;
     const frac = next ? Math.max(0, Math.min(1, (points - cur.min) / (next.min - cur.min))) : 1;
@@ -177,7 +188,8 @@
     const thisMonth = all.filter(se => { const d = new Date(se.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
     const prs = Object.values(bestEver).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    return { sessions: all.length, totalVol, totalSets, prCount, points, cur, next, frac,
+    return { sessions: all.length, totalVol, totalSets, prCount, points,
+      trainingPoints, conditionPoints, kgLost, tierIdx: ti, cur, next, frac,
       weeks, thisWeek, thisMonth, prs, prMax, history: sessionStats.slice().reverse(),
       crewSessions: all.filter(se => se.crew && (se.crew.Faisal || se.crew.Yazan)).length };
   }
@@ -294,7 +306,7 @@
     });
   }
   function renderHome() {
-    const d = derive(store);
+    const d = derive(store); updateBestRank(d);
     const recent = Object.entries(store.sessions || {}).filter(([k, se]) => isDone(se)).map(([k, se]) => ({ key: k, date: se.date, day: se.day, sets: doneSets(se).length, vol: doneSets(se).reduce((a, s) => a + (+s.weight || 0) * (+s.reps || 0), 0) })).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
     const doneAll = Object.values(store.sessions || {}).filter(isDone);
     const doneDesc = doneAll.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -304,7 +316,7 @@
     const startDay = resume ? store.sessions[store.current].day : plannedDay();
     const startTitle = (PROGRAM[startDay] || {}).title || "Session";
 
-    if (d.sessions === 0 && !resume) { renderHomeZero(startDay, startTitle); return; }
+    if (d.sessions === 0 && !resume && !(store.bodyweight || []).length) { renderHomeZero(startDay, startTitle); return; }
 
     const nextLine = isTrainingDay() ? "Today" : `Next session · ${nextDayLabel()}`;
     const cells = d.weeks.map(w => {
@@ -324,11 +336,13 @@
 
       <p class="kicker">Rank</p>
       <h1 class="rank__tier">${d.cur.n}</h1>
+      ${store.bestRankIdx > d.tierIdx ? `<p class="rank__peak">Peak · ${TIERS[store.bestRankIdx].n}</p>` : ""}
       <div class="meter"><span class="meter__fill" id="home-meter"></span></div>
       <div class="rank__row">
         <span class="rank__pts">${d.points} points</span>
         <span class="rank__next">${d.next ? `<b>${Math.max(0, d.next.min - d.points)} to ${d.next.n}</b>` : "Apex reached"}</span>
       </div>
+      <p class="rank__break">Form ${d.trainingPoints} · last 8 weeks${d.conditionPoints ? ` &nbsp;·&nbsp; Bodyweight ${d.conditionPoints} · ${fmtN(d.kgLost)} kg down` : ""}</p>
 
       <div class="start">
         <div class="start__meta"><span class="start__day">${startTitle.split(" — ")[0]}</span><span class="start__sub">${(startTitle.split(" — ")[1] || "")}</span></div>
@@ -611,6 +625,7 @@
         <p class="finish__k">Cairn</p>
         <h1 class="finish__h">Welcome.</h1>
         <p class="finish__sub">Six weeks, three days a week — you, Faisal and Yazan. The app is your coach: it picks your weights, watches your joints, and moves you up only when you've earned it. Log honest and it adapts.</p>
+        <p class="finish__sub" style="margin-top:12px">Your rank isn't a lifetime score — it's your <b>current form</b>: your last eight weeks of training plus the weight you've dropped. Keep both moving to hold it. Stop, and it fades. Your peak stays on record.</p>
         <p class="finish__sub" style="margin-top:12px">Two tabs. <b>Home</b> is your journey — rank, bodyweight, every personal best. <b>Train</b> runs the session set by set, with the form video a tap away.</p>
         <div class="finish__actions"><button class="btn btn--solid" id="ob-go">Begin</button></div>
       </div>`;
@@ -849,17 +864,23 @@
 
   // ---------- FINISH ----------
   function finishSession() {
-    const day = guided ? guided.day : currentDay(); const { session } = getSession(store, day);
-    const before = derive(store).points;
+    const day = guided ? guided.day : currentDay(); const { key, session } = getSession(store, day);
+    const before = pointsWithout(key);   // score as if this session hadn't happened → the finish meter shows its real gain
     session.completedAt = new Date().toISOString();
     save(store);
     stopRest(); guided = null;
     view = { name: "finish", before, day }; render();
   }
+  function pointsWithout(key) {
+    const clone = Object.assign({}, store, { sessions: Object.assign({}, store.sessions) });
+    delete clone.sessions[key];
+    return derive(clone).points;
+  }
+  function updateBestRank(d) { if (d.tierIdx > (store.bestRankIdx || 0)) { store.bestRankIdx = d.tierIdx; save(store); } }
 
   function renderFinish() {
     const day = view.day; const prog = PROGRAM[day] || { title: "Session" };
-    const d = derive(store);
+    const d = derive(store); updateBestRank(d);
     const { session } = getSession(store, day);
     const sets = doneSets(session).length;
     const vol = doneSets(session).reduce((a, s) => a + (+s.weight || 0) * (+s.reps || 0), 0);
