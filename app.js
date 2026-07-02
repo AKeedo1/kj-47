@@ -338,8 +338,8 @@
         ${btb}
       </div>
 
-      ${!isTrainingDay() ? `<div class="section"><div class="section__head"><span class="section__title">Rest day</span></div>
-        <div class="warm"><p class="warm__aero">Recovery, not nothing — keep the blood moving.</p><ul class="warm__list"><li>20-30 min easy walk</li><li>Ankle rocks and short-foot holds — flat feet love daily reps</li><li>Band pull-aparts × 20 for the upper back</li><li>Log today's bodyweight if you haven't</li></ul></div>
+      ${!isTrainingDay() ? `<div class="section"><div class="section__head"><span class="section__title">Recovery</span></div>
+        <div class="warm"><p class="warm__aero">Not a scheduled day — train if you want to, or keep the blood moving.</p><ul class="warm__list"><li>20-30 min easy walk</li><li>Ankle rocks and short-foot holds — flat feet love daily reps</li><li>Band pull-aparts × 20 for the upper back</li><li>Log today's bodyweight if you haven't</li></ul></div>
       </div>` : ""}
 
       <div class="stats">
@@ -434,14 +434,13 @@
 
   function currentDay() {
     if (store.current && store.sessions[store.current]) return store.sessions[store.current].day;
-    return todayDay();
+    return plannedDay();   // preview follows the session picker / rotation, not the calendar day
   }
 
   function renderTrain() {
     const day = currentDay();
     const prog = PROGRAM[day]; if (!prog) { view = { name: "home" }; renderHome(); return; }
     const { session } = getSession(store, day);
-    const mod = feelMod(session);
     const active = !!(store.current && store.sessions[store.current] && store.sessions[store.current].day === day && !store.sessions[store.current].completedAt);
 
     screen.innerHTML = `
@@ -657,7 +656,7 @@
   function renderExercise(idx) {
     const day = currentDay(); const prog = PROGRAM[day]; const ex = prog.exercises[idx];
     const { session } = getSession(store, day); const exId = effId(session, idx, ex); const lib = EXERCISE_LIBRARY[exId];
-    const mod = feelMod(session); const last = lastPerformance(store, exId);
+    const last = lastPerformance(store, exId);
     ensureSets(session, exId, ex.sets, last, ex);
     const st = session.exercises[exId];
     const flaggedJoint = session.feel === "joints" && session.joint && (JOINT_LOAD[session.joint] || []).includes(exId) ? session.joint : null;
@@ -787,7 +786,7 @@
     while (guided.setIdx < st.sets.length && st.sets[guided.setIdx].done) guided.setIdx++;
     if (guided.setIdx >= st.sets.length) { guided.exIdx++; guided.setIdx = 0; return renderGuided(); }
 
-    const set = st.sets[guided.setIdx]; const mod = feelMod(session);
+    const set = st.sets[guided.setIdx];
     const feeler = guided.setIdx === 0;
     const total = prog.exercises.length;
     const frac = (guided.exIdx + guided.setIdx / Math.max(1, ex.sets)) / total;
@@ -897,7 +896,6 @@
 
   // ---------- helpers ----------
   function effId(session, idx, ex) { return (session.swaps && session.swaps[idx]) || ex.id; }
-  function feelMod(session) { const o = FEEL_OPTIONS.find(x => x.id === session.feel); return o ? o.loadModifier : 1; }
   // ---- progression engine (Marcus's brain) ----
   function programWeek() { if (!store.started) return 1; const d = Math.floor((Date.now() - new Date(store.started).getTime()) / 86400000); return Math.min(6, Math.max(1, Math.floor(d / 7) + 1)); }
   function startWeight(exId, ex) { return (typeof STARTING_WEIGHTS !== "undefined" && STARTING_WEIGHTS[exId]) || parseTargetKg(ex.target) || 0; }
@@ -961,14 +959,6 @@
   }
   function parseTargetKg(t) { const m = (t || "").match(/(\d+(?:\.\d+)?)\s*kg/i); return m ? parseFloat(m[1]) : 0; }
   function round25(n) { return Math.max(0, Math.round((+n || 0) / 2.5) * 2.5); }
-  function scaledScheme(ex, mod) { return `${ex.sets} × ${ex.reps}`; }
-  function scaledTarget(ex, mod, session, exId, feeler) {
-    const last = lastPerformance(store, exId); const lw = last && last[0] ? parseFloat(last[0].weight) : null;
-    if (feeler) return "ramp set";
-    if (lw && mod < 1) return `down ${Math.round((1 - mod) * 100)}% — ~${Math.round(lw * mod / 2.5) * 2.5} kg`;
-    if (lw) return `last ${fmtN(lw)} kg · try ${fmtN(Math.round((lw + 2.5) * 2) / 2)}`;
-    return ex.target;
-  }
   function checkPR(exId, set) {
     // "first" = first-ever log of this exercise; a "was W×R" string = beat a prior best; null = no PR
     const w = +set.weight || 0, r = +set.reps || 0; if (w <= 0) return null;
@@ -988,7 +978,14 @@
     }
     return best;
   }
-  function persist(day) { const { session } = getSession(store, day); Object.values(session.exercises).forEach(e => { e.completed = (e.sets || []).length > 0 && e.sets.every(s => s.done); }); save(store); }
+  function persist(day) {
+    const { key, session } = getSession(store, day);
+    const anyDone = Object.values(session.exercises).some(e => (e.sets || []).some(s => s.done));
+    if (anyDone && !store.current) store.current = key;                    // claim as the live session once real data exists
+    if (anyDone && !store.started) store.started = new Date().toISOString();
+    Object.values(session.exercises).forEach(e => { e.completed = (e.sets || []).length > 0 && e.sets.every(s => s.done); });
+    save(store);
+  }
 
   function wireDemo(box) {
     if (!box) return;
@@ -1051,10 +1048,9 @@
   // ---------- tabs ----------
   tabbar.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => {
     const t = b.dataset.tab;
-    if (t === "train") { const day = currentDay(); startSessionSoft(day); }
+    if (t === "train") { view = { name: "train" }; render(); }   // preview the active-or-planned session; no phantom "current"
     else { view = { name: "home" }; render(); }
   }));
-  function startSessionSoft(day) { getSession(store, day); if (!store.current) store.current = dateKey(day); save(store); view = { name: "train", day }; render(); }
 
   // ---------- boot ----------
   history.replaceState({ v: "home" }, "");
