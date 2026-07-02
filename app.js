@@ -308,8 +308,10 @@
       <p class="exhead__idx">Bodyweight</p>
       <h1 class="exhead__name">History</h1>
       ${bw.length > 1 ? lineChart(bw.map(x => x.kg)) : ""}
+      ${store.bwGoal ? `<p class="rank__break" style="margin-top:12px">Goal ${fmtN(store.bwGoal)} kg${bw.length ? ` · ${fmtN(Math.max(0, Math.round((bw[bw.length - 1].kg - store.bwGoal) * 10) / 10))} to go` : ""}</p>` : ""}
       <div class="logger" id="bw-list" style="margin-top:20px"></div>
       <button class="btn btn--ghost" id="log-bw" style="margin-top:20px">Log weight</button><div id="bw-form" hidden style="margin-top:12px"></div>
+      <button class="pglink" id="bw-goal">${store.bwGoal ? "Edit goal weight" : "Set a goal weight"}</button>
     `;
     document.getElementById("bw-back").addEventListener("click", () => history.back());
     renderBwRows();
@@ -372,10 +374,13 @@
     screen.innerHTML = `
       <button class="back" id="mv-back">Back</button>
       <p class="exhead__idx">Movement</p>
-      <h1 class="exhead__name">History</h1>
+      <h1 class="exhead__name">Log a session</h1>
+      <button class="btn btn--ghost" id="log-move" style="margin-top:6px">Log movement</button><div id="move-form" hidden style="margin-top:12px"></div>
+      <button class="pglink" id="mob-link">Mobility flow · standing videos</button>
       <div class="logger" id="mv-list" style="margin-top:20px"></div>`;
     document.getElementById("mv-back").addEventListener("click", () => history.back());
     renderMoveRows();
+    wireMovement();
   }
   function renderMoveRows() {
     const box = document.getElementById("mv-list"); if (!box) return;
@@ -416,115 +421,144 @@
     }));
   }
 
+  function rankStackSVG() {
+    return `<svg width="120" height="182" viewBox="0 0 120 182" fill="none">
+      <ellipse class="stone" cx="60" cy="168" rx="50" ry="14" fill="#e79521"/>
+      <ellipse class="stone" cx="58" cy="144" rx="42" ry="13" fill="#eea22f"/>
+      <ellipse class="stone" cx="61" cy="122" rx="35" ry="12" fill="#e79521"/>
+      <ellipse class="stone" cx="59" cy="102" rx="29" ry="11" fill="#eea22f"/>
+      <ellipse class="stone" cx="60" cy="85" rx="23" ry="10" fill="#f1efe8"/>
+      <ellipse cx="60" cy="68" rx="17" ry="8" fill="none" stroke="#5a4a2c" stroke-width="1.4" stroke-dasharray="3 4"/>
+    </svg>`;
+  }
+  function totalTrainMs() {
+    let ms = 0;
+    Object.values(store.sessions || {}).forEach(se => {
+      if (!se.completedAt) return;
+      const dur = new Date(se.completedAt).getTime() - new Date(se.startedAt || se.date).getTime();
+      if (dur > 0 && dur < 6 * 3600000) ms += dur;   // cap 6h to ignore stale preview timestamps
+    });
+    return ms;
+  }
+  function fmtDur(ms) { const m = Math.round(ms / 60000); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${m % 60}m` : `${m}m`; }
+  function bwTileHTML(now, first, delta, goal) {
+    const lost = Math.max(0, first - now);
+    let bar = "", row = "";
+    if (goal) {
+      const span = Math.max(1, first - goal), pct = Math.max(0, Math.min(100, (lost / span) * 100));
+      const toGo = Math.round((now - goal) * 10) / 10;
+      bar = `<div class="nh-bwbar"><span style="width:${pct.toFixed(0)}%"></span></div>`;
+      row = `<div class="nh-bwrow"><span>${fmtN(first)} start</span><span>${toGo > 0 ? `<b style="color:var(--acc)">${fmtN(toGo)} kg</b> to goal · ${fmtN(goal)}` : `goal reached · ${fmtN(goal)}`}</span></div>`;
+    } else {
+      row = `<div class="nh-bwrow"><span>${fmtN(first)} start</span><span style="color:var(--acc-deep)">tap to set a goal</span></div>`;
+    }
+    return `<button class="nh-tile wide" id="bw-tile"><div class="nh-th"><span>Bodyweight · your #1</span><span class="nh-go">＋</span></div>
+      <div class="nh-bwtop"><span class="nh-big" style="margin-top:0">${fmtN(now)}<small> kg</small></span><span style="color:var(--acc);font-size:13px">${delta <= 0 ? "▼" : "▲"} ${fmtN(Math.abs(delta))} since start</span></div>
+      ${bar}${row}</button>`;
+  }
   function renderHome() {
     const d = derive(store); updateBestRank(d);
-    const recent = Object.entries(store.sessions || {}).filter(([k, se]) => isDone(se)).map(([k, se]) => ({ key: k, date: se.date, day: se.day, sets: doneSets(se).length, vol: doneSets(se).reduce((a, s) => a + (+s.weight || 0) * (+s.reps || 0), 0) })).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
-    const doneAll = Object.values(store.sessions || {}).filter(isDone);
-    const doneDesc = doneAll.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+    const doneDesc = Object.values(store.sessions || {}).filter(isDone).sort((a, b) => new Date(b.date) - new Date(a.date));
     let crewStreak = 0; for (const s of doneDesc) { if (s.crew && (s.crew.Faisal || s.crew.Yazan)) crewStreak++; else break; }
-    const crewLast = doneDesc.slice(0, 10); const crewIn = {}; CREW.forEach(c => crewIn[c] = crewLast.filter(s => s.crew && s.crew[c]).length);
     const resume = store.current && store.sessions[store.current] && !store.sessions[store.current].completedAt && isDone(store.sessions[store.current]);
     const startDay = resume ? store.sessions[store.current].day : plannedDay();
-    const startTitle = (PROGRAM[startDay] || {}).title || "Session";
+    const prog = PROGRAM[startDay] || {}; const exCount = (prog.exercises || []).length;
 
-    if (d.sessions === 0 && !resume && !(store.bodyweight || []).length && !(store.movement || []).length) { renderHomeZero(startDay, startTitle); return; }
+    if (d.sessions === 0 && !resume && !(store.bodyweight || []).length && !(store.movement || []).length) { renderHomeZero(startDay, (prog.title || "Session")); return; }
 
-    const nextLine = resume ? "In progress" : `Next up · ${DAY_SHORT[startDay]}`;
-    const cells = d.weeks.map(w => {
-      const lv = w.sess >= 3 ? "l3" : w.sess === 2 ? "l2" : w.sess === 1 ? "l1" : "";
-      return Array.from({ length: 3 }, (_, i) => `<span class="weeks__cell ${i < w.sess ? lv : ""}"></span>`).join("");
-    }).join("");
+    const bw = store.bodyweight || [];
+    const bwNow = bw.length ? bw[bw.length - 1].kg : null, bwFirst = bw.length ? bw[0].kg : null;
+    const bwDelta = bw.length ? Math.round((bwNow - bwFirst) * 10) / 10 : 0;
+    const goal = store.bwGoal;
+    const bwTile = bw.length ? bwTileHTML(bwNow, bwFirst, bwDelta, goal)
+      : `<button class="nh-tile wide" id="bw-tile"><div class="nh-th"><span>Bodyweight · your #1</span><span class="nh-go">＋</span></div><div class="nh-sub" style="margin-top:10px">Log your weight — for you it's the number that matters most. Tap to start.</div></button>`;
+
+    const bestLift = d.prs.slice().sort((a, b) => b.e1rm - a.e1rm)[0];
+    const bestName = bestLift ? (EXERCISE_LIBRARY[bestLift.exId] || { name: bestLift.exId }).name : "—";
+    const dots = Array.from({ length: 3 }, (_, i) => `<i class="${i < d.thisWeek ? "on" : ""}"></i>`).join("");
     const maxVol = Math.max(1, ...d.weeks.map(w => w.vol));
-
-    let btb = "";
-    if (!resume && doneDesc[0]) {
-      const hrs = (Date.now() - new Date(doneDesc[0].date).getTime()) / 3600000;
-      if (hrs < 20) btb = `<p class="start__btb">Trained ${hrs < 1 ? "under an hour" : Math.round(hrs) + "h"} ago — this'll be back-to-back. Fine now and then; ~48h between sessions is the sweet spot.</p>`;
-    }
+    const volBars = d.weeks.map(w => `<i class="${w.vol > 0 ? "on" : ""}" style="height:${Math.max(6, (w.vol / maxVol) * 100)}%"></i>`).join("");
+    const showCells = d.weeks.map(w => { const lv = w.sess >= 3 ? "l3" : w.sess === 2 ? "l2" : w.sess === 1 ? "l1" : ""; return Array.from({ length: 3 }, (_, i) => `<span class="weeks__cell ${i < w.sess ? lv : ""}"></span>`).join(""); }).join("");
+    const moveMin = (store.movement || []).reduce((a, m) => a + (+m.minutes || 0), 0);
+    const wkLabel = store.started ? ` · Wk ${programWeek()}/6` : "";
 
     screen.innerHTML = `
-      <div class="home__top"><span class="home__brand">Cairn</span><span class="kicker">${nextLine}</span></div>
+      <div class="home__top"><span class="home__brand">Cairn</span><span class="kicker">${fmtDate(new Date().toISOString())}${wkLabel}</span></div>
 
-      <p class="kicker">Rank</p>
-      <h1 class="rank__tier">${d.cur.n}</h1>
-      ${store.bestRankIdx > d.tierIdx ? `<p class="rank__peak">Peak · ${TIERS[store.bestRankIdx].n}</p>` : ""}
-      <div class="meter"><span class="meter__fill" id="home-meter"></span></div>
-      <div class="rank__row">
-        <span class="rank__pts">${d.points} points</span>
-        <span class="rank__next">${d.next ? `<b>${Math.max(0, d.next.min - d.points)} to ${d.next.n}</b>` : "Apex reached"}</span>
-      </div>
-      <p class="rank__break">Form ${d.strengthPoints}${d.movePoints ? ` · Movement ${d.movePoints}` : ""} · last 8 weeks${d.conditionPoints ? ` &nbsp;·&nbsp; Bodyweight ${d.conditionPoints} · ${fmtN(d.kgLost)} kg down` : ""}</p>
-
-      <div class="start">
-        <div class="start__meta"><span class="start__day">${startTitle.split(" — ")[0]}</span><span class="start__sub">${(startTitle.split(" — ")[1] || "")}</span></div>
-        ${resume ? "" : `<div class="pick" id="day-pick">${ROTATION.map(dk => `<button class="pick__chip ${dk === startDay ? "is-sel" : ""}" data-pick="${dk}">${DAY_SHORT[dk]}</button>`).join("")}</div>`}
-        <button class="btn btn--solid" id="start-btn">${resume ? "Resume session" : "Start session"}</button>
-        <p class="start__rest">${resume ? "Pick up where you left off." : isTrainingDay() ? `With Faisal and Yazan · ${d.thisWeek} of 3 this week.` : `Train any day — ${d.thisWeek} of 3 this week. Switch the session above.`}</p>
-        ${btb}
-      </div>
-
-      ${!isTrainingDay() ? `<div class="section"><div class="section__head"><span class="section__title">Recovery</span></div>
-        <div class="warm"><p class="warm__aero">Not a scheduled day — train if you want to, or keep the blood moving.</p><ul class="warm__list"><li>20-30 min easy walk</li><li>Ankle rocks and short-foot holds — flat feet love daily reps</li><li>Band pull-aparts × 20 for the upper back</li><li>Log today's bodyweight if you haven't</li></ul></div>
-      </div>` : ""}
-
-      <div class="stats">
-        <div class="stat"><div class="v">${d.sessions}</div><div class="u">Sessions</div></div>
-        <div class="stat"><div class="v">${d.thisMonth}</div><div class="u">This month</div></div>
-        <div class="stat"><div class="v">${fmtVol(d.totalVol)}</div><div class="u">Kg lifted</div></div>
-        <div class="stat"><div class="v">${d.crewSessions}</div><div class="u">With the crew</div></div>
-      </div>
-
-      <div class="section">
-        <div class="section__head"><span class="section__title">Showing up</span><span class="section__aside">${d.thisWeek} of 3 this week</span></div>
-        <div class="weeks">${cells}</div>
-      </div>
-
-      <div class="section"><div class="section__head"><span class="section__title">The crew</span>${crewStreak > 1 ? `<span class="section__aside">${crewStreak}-session streak</span>` : ""}</div>
-        ${CREW.map(c => `<div class="pr"><span class="pr__name">${c}</span><span class="pr__val">${crewIn[c]}<small>of last ${crewLast.length || 0}</small></span></div>`).join("")}
-        ${crewStreak > 1 ? `<p class="coach" style="margin-top:12px">${crewStreak} sessions as a crew. Don't be the one who breaks it.</p>` : ""}
-      </div>
-
-      <div class="section">
-        <div class="section__head"><span class="section__title">Volume</span><span class="section__aside">Last 6 weeks</span></div>
-        <div class="chart">
-          ${d.weeks.map(w => `<div class="chart__col"><span class="chart__bar ${w.vol > 0 ? "is-on" : ""}" style="height:${Math.max(3, (w.vol / maxVol) * 100)}%"></span><span class="chart__lbl">${weekLbl(w.start)}</span></div>`).join("")}
+      <div class="nh-hero-wrap" id="hero-wrap">
+        <div class="nh-hero">
+          ${rankStackSVG()}
+          <div class="nh-rk">
+            <p class="kicker">Your standing</p>
+            <h1 class="rank__tier">${d.cur.n}</h1>
+            <div class="meter"><span class="meter__fill" id="home-meter"></span></div>
+            <p class="rank__pts" style="margin-top:10px">${d.points} points · <b style="color:var(--acc);font-weight:400">${d.next ? `${Math.max(0, d.next.min - d.points)} to ${d.next.n}` : "Apex"}</b></p>
+            ${store.bestRankIdx > d.tierIdx ? `<p class="rank__peak" style="margin-top:6px">Peak · ${TIERS[store.bestRankIdx].n}</p>` : ""}
+            <span class="nh-climb" id="climb">See the climb <span class="nh-chev">›</span></span>
+          </div>
+        </div>
+        <div class="nh-hladder">
+          <div class="ladder">${TIERS.map((t, i) => { const cur = t.n === d.cur.n, pk = i === store.bestRankIdx && store.bestRankIdx > d.tierIdx; return `<div class="ladder__row ${cur ? "is-cur" : ""} ${pk ? "is-peak" : ""}"><span class="ladder__n">${t.n}</span><span class="ladder__p">${i <= d.tierIdx ? "placed" : t.min + " pts"}</span></div>`; }).join("")}</div>
         </div>
       </div>
 
-      ${d.prs.length ? `<div class="section">
-        <div class="section__head"><span class="section__title">Personal bests</span></div>
-        ${d.prs.slice(0, 6).map(p => { const lib = EXERCISE_LIBRARY[p.exId] || { name: p.exId }; return `<button class="pr" data-prex="${p.exId}"><span class="pr__name">${lib.name}</span><span class="pr__val">${fmtN(p.weight)}<small>kg × ${p.reps}</small></span></button>`; }).join("")}
-      </div>` : ""}
+      <div class="nh-card">
+        <div class="ct">${resume ? "Resume" : "Start"} · ${DAY_SHORT[startDay]}</div>
+        <div class="cs">${exCount} exercises · ${d.thisWeek} of 3 this week</div>
+        <button class="btn btn--solid" id="start-btn" style="margin-top:14px">${resume ? "Resume session" : "Start guided session"}</button>
+      </div>
 
-      <div class="section">
-        <div class="section__head"><span class="section__title">Rank ladder</span></div>
-        <div class="ladder">
-          ${TIERS.map((t, i) => { const isPeak = i === store.bestRankIdx && store.bestRankIdx > d.tierIdx; return `<div class="ladder__row ${t.n === d.cur.n ? "is-cur" : ""} ${isPeak ? "is-peak" : ""}"><span class="ladder__n">${t.n}</span><span class="ladder__p">${isPeak ? "peak · " : ""}${t.min} pts</span></div>`; }).join("")}
+      <div class="nh-grid">
+        ${bwTile}
+        <div class="nh-tile"><div class="nh-th"><span>This week</span><span style="color:var(--acc)">${d.thisWeek}/3</span></div><div class="nh-dots">${dots}</div></div>
+        <div class="nh-tile"><div class="nh-th"><span>Crew streak</span></div><div class="nh-big">${crewStreak}</div><div class="nh-sub">${crewStreak > 1 ? "Don't break it" : "in a row"}</div></div>
+        <button class="nh-tile" ${bestLift ? `data-prex="${bestLift.exId}"` : ""}><div class="nh-th"><span>Best lift</span>${bestLift ? '<span class="nh-go">›</span>' : ""}</div><div class="nh-big" style="font-size:19px">${bestName}</div><div class="nh-sub">${bestLift ? `${fmtN(bestLift.weight)} kg × ${bestLift.reps}` : "no PRs yet"}</div></button>
+        <div class="nh-tile"><div class="nh-th"><span>Volume</span><span>6 wk</span></div><div class="nh-bars">${volBars}</div></div>
+      </div>
+
+      <div class="nh-sect">
+        <div class="nh-shead"><span class="l">Showing up</span><span class="r">${store.started ? `Phase 1 · Wk ${programWeek()} of 6` : "Phase 1"}</span></div>
+        <div class="weeks">${showCells}</div>
+        <p class="nh-showline"><b>${d.thisWeek} of 3</b> this week · <b>${d.thisMonth} sessions</b> this month</p>
+      </div>
+
+      <div class="nh-sect">
+        <div class="nh-shead"><span class="l">All-time${store.started ? ` · since ${fmtDate(store.started)}` : ""}</span></div>
+        <div class="nh-grid" style="margin-top:0">
+          <div class="nh-tile"><div class="nh-th"><span>Sessions</span></div><div class="nh-big">${d.sessions}</div></div>
+          <div class="nh-tile"><div class="nh-th"><span>Kg lifted</span></div><div class="nh-big">${fmtVol(d.totalVol)}</div></div>
+          <div class="nh-tile"><div class="nh-th"><span>Personal bests</span></div><div class="nh-big">${d.prCount}</div></div>
+          <div class="nh-tile"><div class="nh-th"><span>Total time</span></div><div class="nh-big" style="font-size:24px">${fmtDur(totalTrainMs())}</div><div class="nh-sub">under the bar</div></div>
         </div>
       </div>
 
-      ${recent.length ? `<div class="section">
-        <div class="section__head"><span class="section__title">Recent sessions</span><span class="section__aside">tap to edit</span></div>
-        <div class="hist">
-          ${recent.map(h => `<button class="hist__row" data-editkey="${h.key}"><span class="hist__day">${DAY_SHORT[h.day] || h.day}</span><span class="hist__meta">${fmtDate(h.date)} · ${h.sets} sets · ${fmtVol(h.vol)} kg</span></button>`).join("")}
+      <div class="nh-sect">
+        <div class="nh-shead"><span class="l">Log</span></div>
+        <button class="nh-logrow" id="log-move-row"><div><div class="lt">Movement</div><div class="ls">${d.moveThisWeek} this week${moveMin ? ` · ${moveMin} min total` : ""}</div></div><span class="nh-go">＋</span></button>
+        <button class="nh-logrow" id="log-mob-row"><div><div class="lt">Mobility flow</div><div class="ls">standing videos · no floor</div></div><span class="nh-go">›</span></button>
+      </div>
+
+      <div class="nh-sect">
+        <div class="nh-shead" style="align-items:center"><span class="l">The numbers</span><div class="nh-seg"><button class="on" data-seg="points">Points</button><button data-seg="raw">Stats</button></div></div>
+        <div class="nh-lgblock" id="lgblock">
+          <div class="nh-lgrow"><div><div class="nh-ln">Strength</div><div class="nh-lsub">sets + PRs · last 8 wks</div></div><div><span class="lp"><div class="nh-lv">${d.strengthPoints}</div><div class="nh-ld">pts</div></span><span class="lr"><div class="nh-lv">${fmtVol(d.totalVol)}</div><div class="nh-ld">kg lifted</div></span></div></div>
+          <div class="nh-lgrow"><div><div class="nh-ln">Movement</div><div class="nh-lsub">runs · sport · mobility</div></div><div><span class="lp"><div class="nh-lv">${d.movePoints}</div><div class="nh-ld">pts</div></span><span class="lr"><div class="nh-lv">${moveMin}</div><div class="nh-ld">minutes</div></span></div></div>
+          <div class="nh-lgrow"><div><div class="nh-ln">Bodyweight</div><div class="nh-lsub">${bwNow ? `${fmtN(bwNow)} kg${goal ? ` · goal ${fmtN(goal)}` : ""}` : "not logged"}</div></div><div><span class="lp"><div class="nh-lv">${d.conditionPoints}</div><div class="nh-ld">pts</div></span><span class="lr"><div class="nh-lv">${bwDelta <= 0 ? "−" : "+"}${fmtN(Math.abs(bwDelta))}</div><div class="nh-ld">kg</div></span></div></div>
         </div>
-      </div>` : ""}
-
-      ${moveSection()}
-
-      ${bwSection()}
+      </div>
 
       <div class="foot"><span class="foot__link">Cairn</span><button class="foot__link" id="settings-btn">Settings</button></div>
     `;
 
     requestAnimationFrame(() => { const m = document.getElementById("home-meter"); if (m) m.style.width = (d.frac * 100).toFixed(1) + "%"; });
     document.getElementById("start-btn").addEventListener("click", () => startSession(startDay));
-    screen.querySelectorAll("[data-pick]").forEach(b => b.addEventListener("click", () => { dayPick = b.dataset.pick; renderHome(); }));
+    document.getElementById("climb").addEventListener("click", () => document.getElementById("hero-wrap").classList.toggle("open"));
     document.getElementById("settings-btn").addEventListener("click", () => go({ name: "settings", back: { name: "home" } }));
     screen.querySelectorAll("[data-prex]").forEach(b => b.addEventListener("click", () => go({ name: "progress", exId: b.dataset.prex, back: { name: "home" } })));
-    screen.querySelectorAll("[data-editkey]").forEach(b => b.addEventListener("click", () => go({ name: "sessionEdit", key: b.dataset.editkey, back: { name: "home" } })));
-    wireBodyweight();
-    wireMovement();
+    document.querySelectorAll("[data-seg]").forEach(b => b.addEventListener("click", () => { const blk = document.getElementById("lgblock"); blk.classList.toggle("raw", b.dataset.seg === "raw"); document.querySelectorAll("[data-seg]").forEach(x => x.classList.toggle("on", x === b)); }));
+    const bwt = document.getElementById("bw-tile"); if (bwt) bwt.addEventListener("click", () => go({ name: "bwEdit", back: { name: "home" } }));
+    const lmr = document.getElementById("log-move-row"); if (lmr) lmr.addEventListener("click", () => go({ name: "moveEdit", back: { name: "home" } }));
+    const lmb = document.getElementById("log-mob-row"); if (lmb) lmb.addEventListener("click", () => go({ name: "mobility", back: { name: "home" } }));
   }
 
   function renderHomeZero(day, title) {
@@ -896,6 +930,7 @@
   // ---------- GUIDED runner ----------
   function startGuided() {
     const day = currentDay(); const prog = PROGRAM[day]; const { session } = getSession(store, day);
+    if (!session.startedAt) { session.startedAt = new Date().toISOString(); save(store); }
     primeAudio();
     // first incomplete exercise / set
     let exIdx = 0, setIdx = 0;
@@ -1131,6 +1166,7 @@
     const anyDone = Object.values(session.exercises).some(e => (e.sets || []).some(s => s.done));
     if (anyDone && !store.current) store.current = key;                    // claim as the live session once real data exists
     if (anyDone && !store.started) store.started = new Date().toISOString();
+    if (anyDone && !session.startedAt) session.startedAt = new Date().toISOString();  // stamp actual start → duration
     Object.values(session.exercises).forEach(e => { e.completed = (e.sets || []).length > 0 && e.sets.every(s => s.done); });
     save(store);
   }

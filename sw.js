@@ -1,5 +1,5 @@
 // Cairn — service worker. Offline-first for the app shell.
-const CACHE = "cairn-v2-030";
+const CACHE = "cairn-v2-031";
 const ASSETS = [
   "./",
   "./index.html",

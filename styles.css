@@ -360,4 +360,59 @@ input{font-family:inherit}
 .rest__btn{padding:11px 16px;border:1px solid var(--line);border-radius:30px;font-size:13px;color:var(--fg-soft)}
 .rest__btn--skip{background:var(--fg);color:var(--bg);border-color:var(--fg);font-family:var(--display)}
 
+/* ===== HOME v2 ===== */
+.nh-hero{display:flex;align-items:center;gap:16px;padding:6px 0 12px}
+.nh-hero svg .stone{filter:drop-shadow(0 4px 7px rgba(0,0,0,.45))}
+.nh-rk{flex:1}
+.nh-rk .rank__tier{font-size:40px;margin-top:2px}
+.nh-rk .meter{margin:12px 0 0}
+.nh-climb{display:inline-block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc-deep);margin-top:12px;cursor:pointer}
+.nh-chev{display:inline-block;transition:transform .2s}
+.nh-hero-wrap.open .nh-chev{transform:rotate(90deg)}
+.nh-hladder{display:none;margin-top:10px}
+.nh-hero-wrap.open .nh-hladder{display:block;animation:fade .3s ease}
+.nh-card{background:var(--bg-2);border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin-top:16px}
+.nh-card .ct{font-family:var(--display);font-size:19px}
+.nh-card .cs{font-size:11px;color:var(--mut);margin-top:2px}
+.nh-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.nh-tile{background:var(--bg-2);border:1px solid var(--line);border-radius:16px;padding:14px;min-height:96px;display:flex;flex-direction:column;text-align:left}
+.nh-tile.wide{grid-column:1 / -1;min-height:auto}
+.nh-th{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between;align-items:center}
+.nh-big{font-family:var(--display);font-weight:300;font-size:30px;margin-top:auto;line-height:1}
+.nh-big small{font-size:12px;color:var(--mut);font-family:var(--serif)}
+.nh-sub{font-size:11px;color:var(--mut);margin-top:5px}
+.nh-go{color:var(--acc);font-size:16px}
+.nh-bwtop{display:flex;align-items:baseline;gap:10px;margin-top:8px}
+.nh-bwbar{height:6px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:12px}
+.nh-bwbar>span{display:block;height:100%;background:var(--acc);border-radius:4px}
+.nh-bwrow{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;font-size:11px;color:var(--mut)}
+.nh-dots{display:flex;gap:5px;margin-top:auto}
+.nh-dots i{width:11px;height:11px;border-radius:3px;background:var(--line)}
+.nh-dots i.on{background:var(--acc)}
+.nh-bars{display:flex;align-items:flex-end;gap:4px;height:36px;margin-top:auto}
+.nh-bars i{flex:1;background:var(--line);border-radius:2px 2px 0 0;min-height:3px}
+.nh-bars i.on{background:var(--acc)}
+.nh-sect{margin-top:26px}
+.nh-shead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.nh-shead .l{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut)}
+.nh-shead .r{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc-deep)}
+.nh-showline{font-size:12px;color:var(--mut);margin-top:12px}
+.nh-showline b{color:var(--fg-soft);font-weight:400}
+.nh-logrow{display:flex;justify-content:space-between;align-items:center;padding:15px 16px;background:var(--bg-2);border:1px solid var(--line);border-radius:14px;margin-top:10px;text-align:left;width:100%}
+.nh-logrow .lt{font-size:15px}
+.nh-logrow .ls{font-size:11px;color:var(--mut);margin-top:2px}
+.nh-seg{display:flex;border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.nh-seg button{background:none;border:none;color:var(--mut);font-family:var(--serif);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:5px 13px}
+.nh-seg button.on{background:var(--acc);color:#17120a}
+.nh-lgblock{border-top:1px solid var(--line)}
+.nh-lgrow{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.nh-lgrow:last-child{border-bottom:none}
+.nh-ln{font-size:15px}
+.nh-lsub{font-size:11px;color:var(--mut);margin-top:2px}
+.nh-lv{font-family:var(--display);font-weight:300;font-size:20px;text-align:right}
+.nh-ld{font-size:11px;color:var(--acc);text-align:right}
+.nh-lgblock .lr{display:none}
+.nh-lgblock.raw .lp{display:none}
+.nh-lgblock.raw .lr{display:block}
+
 [hidden]{display:none !important}
