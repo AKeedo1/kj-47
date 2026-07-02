@@ -45,6 +45,7 @@
     return `<p class="warm__aero">${aero}</p><ul class="warm__list">${list}</ul><p class="warm__cue">${WARMUP.flatfeet}</p>${cue ? `<p class="warm__cue" style="color:var(--acc)">${cue}</p>` : ""}`;
   }
   const CREW = ["Faisal", "Yazan"];
+  const MOVE_TYPES = ["Run", "Walk", "Cycle", "Swim", "Sport", "Yoga", "Class", "Other"];
   const TIERS = [
     { n: "Bronze", min: 0 }, { n: "Iron", min: 300 }, { n: "Steel", min: 800 },
     { n: "Onyx", min: 1600 }, { n: "Slate", min: 2800 }, { n: "Crimson", min: 4400 }, { n: "Apex", min: 6500 }
@@ -79,7 +80,7 @@
   };
 
   // ---------- store ----------
-  const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0, bwGoal: null });
+  const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0, bwGoal: null, movement: [] });
   function load() {
     try { const r = localStorage.getItem(KEY); const s = r ? JSON.parse(r) : blank(); s.sessions = s.sessions || {}; return s; }
     catch (e) { return blank(); }
@@ -133,6 +134,7 @@
 
   const SCORE_WINDOW_DAYS = 56;   // rank counts your last ~8 weeks of training; older sessions age out (current form)
   const BW_RATE = 150;            // score points per kg lost from baseline weigh-in
+  const MOVE_RATE = 2, MOVE_CAP = 120;   // movement: 2 pts/min, capped per session
   function derive(s) {
     const all = Object.values(s.sessions || {}).filter(isDone)
       .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -156,7 +158,12 @@
       });
       sessionStats.push({ date: se.date, day: se.day, volume: sv, sets: doneSets(se).length });
     });
-    const trainingPoints = winSets * 10 + winPR * 40;   // current form — decays as sessions age past the window
+    const strengthPoints = winSets * 10 + winPR * 40;   // strength — sets + PRs in the window
+    // movement — any logged non-lifting session, per-minute capped, windowed (feeds current form, no PRs)
+    let movePoints = 0;
+    (s.movement || []).forEach(m => { if (new Date(m.date).getTime() >= cutoff) movePoints += Math.min((+m.minutes || 0) * MOVE_RATE, MOVE_CAP); });
+    movePoints = Math.round(movePoints);
+    const trainingPoints = strengthPoints + movePoints;   // current form — decays as it ages past the window
     // condition — weight lost from your first logged weigh-in; regain gives these points back
     const bw = s.bodyweight || [];
     const bwBase = bw.length ? bw[0].kg : null, bwNow = bw.length ? bw[bw.length - 1].kg : null;
@@ -179,11 +186,14 @@
       }
     });
     const thisWeek = weeks[5].sess;
+    const mvWkStart = weeks[5].start.getTime(), mvWkEnd = mvWkStart + 7 * 86400000;
+    const moveThisWeek = (s.movement || []).filter(m => { const t = new Date(m.date).getTime(); return t >= mvWkStart && t < mvWkEnd; }).length;
     const thisMonth = all.filter(se => { const d = new Date(se.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
     const prs = Object.values(bestEver).sort((a, b) => new Date(b.date) - new Date(a.date));
 
     return { sessions: all.length, totalVol, totalSets, prCount, points,
-      trainingPoints, conditionPoints, kgLost, tierIdx: ti, cur, next, frac,
+      trainingPoints, strengthPoints, movePoints, conditionPoints, kgLost, tierIdx: ti, cur, next, frac,
+      moveThisWeek, moveTotal: (s.movement || []).length,
       weeks, thisWeek, thisMonth, prs, prMax, history: sessionStats.slice().reverse(),
       crewSessions: all.filter(se => se.crew && (se.crew.Faisal || se.crew.Yazan)).length };
   }
@@ -217,7 +227,7 @@
   window.addEventListener("popstate", () => {
     // step back one logical level
     if (view.name === "exercise" || view.name === "finish") { view = { name: "train" }; render(); }
-    else if (view.name === "progress" || view.name === "sessionEdit" || view.name === "bwEdit" || view.name === "settings") { view = view.back || { name: "home" }; render(); }
+    else if (view.name === "progress" || view.name === "sessionEdit" || view.name === "bwEdit" || view.name === "moveEdit" || view.name === "settings") { view = view.back || { name: "home" }; render(); }
     else if (view.name === "guided") { exitGuided(false); }
     else { view = { name: "home" }; render(); }
   });
@@ -231,6 +241,7 @@
     else if (view.name === "progress") { setTabbar(view.back && view.back.name === "exercise" ? "train" : "home", false); renderProgress(view.exId); }
     else if (view.name === "sessionEdit") { setTabbar("home", false); renderSessionEdit(view.key); }
     else if (view.name === "bwEdit") { setTabbar("home", false); renderBwEdit(); }
+    else if (view.name === "moveEdit") { setTabbar("home", false); renderMoveEdit(); }
     else if (view.name === "settings") { setTabbar("home", false); renderSettings(); }
     else if (view.name === "guided") { setTabbar(null, true); renderGuided(); }
     else if (view.name === "finish") { setTabbar(null, true); renderFinish(); }
@@ -315,6 +326,61 @@
       box.appendChild(row);
     });
   }
+  // ---------- MOVEMENT (non-lifting activity) ----------
+  function moveSection() {
+    const mv = (store.movement || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+    const recent = mv.slice(0, 4);
+    return `<div class="section"><div class="section__head"><span class="section__title">Movement</span>${mv.length ? `<span class="section__aside">counts toward form</span>` : ""}</div>
+      ${recent.length
+        ? `<div class="hist">${recent.map(m => `<div class="hist__row" style="cursor:default"><span class="hist__day">${m.type}</span><span class="hist__meta">${fmtDate(m.date)} · ${m.minutes} min${m.note ? " · " + m.note : ""}</span></div>`).join("")}</div>`
+        : `<p class="zero__sub" style="margin-top:2px">A run, a match, a walk, a yoga flow — anything that isn't the barbell still counts toward your rank.</p>`}
+      <button class="btn btn--ghost" id="log-move" style="margin-top:14px">Log movement</button><div id="move-form" hidden style="margin-top:12px"></div>
+      ${mv.length ? `<button class="pglink" id="move-edit">Edit entries</button>` : ""}</div>`;
+  }
+  function wireMovement() {
+    const me = document.getElementById("move-edit"); if (me) me.addEventListener("click", () => go({ name: "moveEdit", back: { name: "home" } }));
+    const btn = document.getElementById("log-move"); if (!btn) return;
+    btn.addEventListener("click", () => {
+      const box = document.getElementById("move-form"); box.hidden = false; btn.hidden = true;
+      let selType = "Run";
+      box.innerHTML = `
+        <div class="pick" id="move-types" style="flex-wrap:wrap">${MOVE_TYPES.map(t => `<button class="pick__chip ${t === selType ? "is-sel" : ""}" data-mt="${t}" style="flex:0 0 auto">${t}</button>`).join("")}</div>
+        <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><input class="stepper__f" id="move-min" inputmode="numeric" placeholder="min" style="width:96px;text-align:left;font-size:26px"><span class="stepper__u" style="width:auto">min</span><button class="btn btn--solid" id="move-save" style="width:auto;padding:12px 24px">Save</button></div>
+        <input class="note" id="move-note" placeholder="Note (optional)" style="min-height:auto;margin-top:10px">`;
+      box.querySelectorAll("[data-mt]").forEach(b => b.addEventListener("click", () => { selType = b.dataset.mt; box.querySelectorAll("[data-mt]").forEach(x => x.classList.toggle("is-sel", x.dataset.mt === selType)); }));
+      document.getElementById("move-save").addEventListener("click", () => {
+        const min = parseInt(document.getElementById("move-min").value, 10);
+        if (!min || min < 1 || min > 600) return;
+        const note = document.getElementById("move-note").value.trim();
+        store.movement = store.movement || [];
+        store.movement.push({ date: new Date().toISOString(), type: selType, minutes: min, note });
+        save(store); render();
+      });
+      document.getElementById("move-min").focus();
+    });
+  }
+  function renderMoveEdit() {
+    screen.innerHTML = `
+      <button class="back" id="mv-back">Back</button>
+      <p class="exhead__idx">Movement</p>
+      <h1 class="exhead__name">History</h1>
+      <div class="logger" id="mv-list" style="margin-top:20px"></div>`;
+    document.getElementById("mv-back").addEventListener("click", () => history.back());
+    renderMoveRows();
+  }
+  function renderMoveRows() {
+    const box = document.getElementById("mv-list"); if (!box) return;
+    const mv = store.movement || []; box.innerHTML = "";
+    if (!mv.length) { box.innerHTML = `<p class="muted" style="font-size:13px">No entries yet.</p>`; return; }
+    mv.map((e, i) => ({ e, i })).reverse().forEach(({ e, i }) => {
+      const row = document.createElement("div"); row.className = "setrow";
+      row.innerHTML = `<span class="setrow__n" style="width:auto;flex:1">${e.type} · ${e.minutes} min<span style="display:block;color:var(--mut);font-size:11px;margin-top:2px">${fmtDate(e.date)}${e.note ? " · " + e.note : ""}</span></span>
+        <button class="setrow__log is-off" data-del style="width:auto;padding:0 12px">Remove</button>`;
+      row.querySelector("[data-del]").addEventListener("click", () => { if (!confirm("Remove this entry?")) return; store.movement.splice(i, 1); save(store); renderMoveEdit(); });
+      box.appendChild(row);
+    });
+  }
+
   function renderHome() {
     const d = derive(store); updateBestRank(d);
     const recent = Object.entries(store.sessions || {}).filter(([k, se]) => isDone(se)).map(([k, se]) => ({ key: k, date: se.date, day: se.day, sets: doneSets(se).length, vol: doneSets(se).reduce((a, s) => a + (+s.weight || 0) * (+s.reps || 0), 0) })).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
@@ -326,7 +392,7 @@
     const startDay = resume ? store.sessions[store.current].day : plannedDay();
     const startTitle = (PROGRAM[startDay] || {}).title || "Session";
 
-    if (d.sessions === 0 && !resume && !(store.bodyweight || []).length) { renderHomeZero(startDay, startTitle); return; }
+    if (d.sessions === 0 && !resume && !(store.bodyweight || []).length && !(store.movement || []).length) { renderHomeZero(startDay, startTitle); return; }
 
     const nextLine = resume ? "In progress" : `Next up · ${DAY_SHORT[startDay]}`;
     const cells = d.weeks.map(w => {
@@ -352,7 +418,7 @@
         <span class="rank__pts">${d.points} points</span>
         <span class="rank__next">${d.next ? `<b>${Math.max(0, d.next.min - d.points)} to ${d.next.n}</b>` : "Apex reached"}</span>
       </div>
-      <p class="rank__break">Form ${d.trainingPoints} · last 8 weeks${d.conditionPoints ? ` &nbsp;·&nbsp; Bodyweight ${d.conditionPoints} · ${fmtN(d.kgLost)} kg down` : ""}</p>
+      <p class="rank__break">Form ${d.strengthPoints}${d.movePoints ? ` · Movement ${d.movePoints}` : ""} · last 8 weeks${d.conditionPoints ? ` &nbsp;·&nbsp; Bodyweight ${d.conditionPoints} · ${fmtN(d.kgLost)} kg down` : ""}</p>
 
       <div class="start">
         <div class="start__meta"><span class="start__day">${startTitle.split(" — ")[0]}</span><span class="start__sub">${(startTitle.split(" — ")[1] || "")}</span></div>
@@ -409,6 +475,8 @@
         </div>
       </div>` : ""}
 
+      ${moveSection()}
+
       ${bwSection()}
 
       <div class="foot"><span class="foot__link">Cairn</span><button class="foot__link" id="settings-btn">Settings</button></div>
@@ -421,6 +489,7 @@
     screen.querySelectorAll("[data-prex]").forEach(b => b.addEventListener("click", () => go({ name: "progress", exId: b.dataset.prex, back: { name: "home" } })));
     screen.querySelectorAll("[data-editkey]").forEach(b => b.addEventListener("click", () => go({ name: "sessionEdit", key: b.dataset.editkey, back: { name: "home" } })));
     wireBodyweight();
+    wireMovement();
   }
 
   function renderHomeZero(day, title) {
@@ -439,12 +508,14 @@
         <button class="btn btn--solid" id="start-btn">Start session one</button>
       </div>
       ${bwSection()}
+      ${moveSection()}
       <div class="section">
         <div class="section__head"><span class="section__title">Rank ladder</span></div>
         <div class="ladder">${TIERS.map((t, i) => `<div class="ladder__row ${i === 0 ? "is-cur" : ""}"><span class="ladder__n">${t.n}</span><span class="ladder__p">${t.min} pts</span></div>`).join("")}</div>
       </div>`;
     document.getElementById("start-btn").addEventListener("click", () => startSession(day));
     wireBodyweight();
+    wireMovement();
   }
 
   // ---------- TRAIN (session overview) ----------
@@ -660,7 +731,7 @@
         <p class="feel__note">iOS can't wake a web app in the background yet, so this pings you when you open the app on a training day. A true morning alert needs a server — on the roadmap.</p>
       </div>
       <div class="section"><p class="section__title">How Cairn works</p>
-        <p class="feel__note" style="margin-top:10px;line-height:1.6">Your rank is your <b>current form</b> — your last eight weeks of training plus the weight you've dropped. Keep both moving to hold it; stop and it fades, but your peak stays on record. Each logged set is 10 points, a personal best 40, and every kilo lost 150.</p>
+        <p class="feel__note" style="margin-top:10px;line-height:1.6">Your rank is your <b>current form</b> — your last eight weeks of training plus the weight you've dropped. Keep both moving to hold it; stop and it fades, but your peak stays on record. Each logged set is 10 points, a personal best 40, every kilo lost 150, and other movement — runs, sport, yoga, walks — 2 a minute. Strength is the only place personal bests live.</p>
       </div>
       <div class="section"><p class="section__title">Data</p>
         <button class="btn btn--ghost" id="s-export" style="margin-top:12px">Back up data</button>
