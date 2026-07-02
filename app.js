@@ -45,7 +45,13 @@
     return `<p class="warm__aero">${aero}</p><ul class="warm__list">${list}</ul><p class="warm__cue">${WARMUP.flatfeet}</p>${cue ? `<p class="warm__cue" style="color:var(--acc)">${cue}</p>` : ""}`;
   }
   const CREW = ["Faisal", "Yazan"];
-  const MOVE_TYPES = ["Run", "Walk", "Cycle", "Swim", "Sport", "Yoga", "Class", "Other"];
+  const MOVE_TYPES = ["Run", "Walk", "Cycle", "Swim", "Sport", "Yoga", "Mobility", "Class", "Other"];
+  // Standing / no-floor mobility follow-alongs (verified embeddable YouTube IDs)
+  const MOBILITY = [
+    { name: "Daily tightness reset", minutes: 10, video: "ws80khBG04c", videoTitle: "10 Min Daily Mobility · All Standing — Julia Reppel" },
+    { name: "Standing full-body flow", minutes: 10, video: "--CvLp8oDKM", videoTitle: "10 Min Standing Mobility Routine · Full Body — amy dot" },
+    { name: "Morning wake-up", minutes: 10, video: "aRVFt79LqCM", videoTitle: "10 Min Morning Mobility · Full Body, No Equipment — Julia Reppel" }
+  ];
   const TIERS = [
     { n: "Bronze", min: 0 }, { n: "Iron", min: 300 }, { n: "Steel", min: 800 },
     { n: "Onyx", min: 1600 }, { n: "Slate", min: 2800 }, { n: "Crimson", min: 4400 }, { n: "Apex", min: 6500 }
@@ -227,7 +233,7 @@
   window.addEventListener("popstate", () => {
     // step back one logical level
     if (view.name === "exercise" || view.name === "finish") { view = { name: "train" }; render(); }
-    else if (view.name === "progress" || view.name === "sessionEdit" || view.name === "bwEdit" || view.name === "moveEdit" || view.name === "settings") { view = view.back || { name: "home" }; render(); }
+    else if (view.name === "progress" || view.name === "sessionEdit" || view.name === "bwEdit" || view.name === "moveEdit" || view.name === "mobility" || view.name === "settings") { view = view.back || { name: "home" }; render(); }
     else if (view.name === "guided") { exitGuided(false); }
     else { view = { name: "home" }; render(); }
   });
@@ -242,6 +248,7 @@
     else if (view.name === "sessionEdit") { setTabbar("home", false); renderSessionEdit(view.key); }
     else if (view.name === "bwEdit") { setTabbar("home", false); renderBwEdit(); }
     else if (view.name === "moveEdit") { setTabbar("home", false); renderMoveEdit(); }
+    else if (view.name === "mobility") { setTabbar("home", false); renderMobility(); }
     else if (view.name === "settings") { setTabbar("home", false); renderSettings(); }
     else if (view.name === "guided") { setTabbar(null, true); renderGuided(); }
     else if (view.name === "finish") { setTabbar(null, true); renderFinish(); }
@@ -335,10 +342,12 @@
         ? `<div class="hist">${recent.map(m => `<div class="hist__row" style="cursor:default"><span class="hist__day">${m.type}</span><span class="hist__meta">${fmtDate(m.date)} · ${m.minutes} min${m.note ? " · " + m.note : ""}</span></div>`).join("")}</div>`
         : `<p class="zero__sub" style="margin-top:2px">A run, a match, a walk, a yoga flow — anything that isn't the barbell still counts toward your rank.</p>`}
       <button class="btn btn--ghost" id="log-move" style="margin-top:14px">Log movement</button><div id="move-form" hidden style="margin-top:12px"></div>
+      <button class="pglink" id="mob-link">Mobility flow · standing videos</button>
       ${mv.length ? `<button class="pglink" id="move-edit">Edit entries</button>` : ""}</div>`;
   }
   function wireMovement() {
     const me = document.getElementById("move-edit"); if (me) me.addEventListener("click", () => go({ name: "moveEdit", back: { name: "home" } }));
+    const ml = document.getElementById("mob-link"); if (ml) ml.addEventListener("click", () => go({ name: "mobility", back: { name: "home" } }));
     const btn = document.getElementById("log-move"); if (!btn) return;
     btn.addEventListener("click", () => {
       const box = document.getElementById("move-form"); box.hidden = false; btn.hidden = true;
@@ -379,6 +388,32 @@
       row.querySelector("[data-del]").addEventListener("click", () => { if (!confirm("Remove this entry?")) return; store.movement.splice(i, 1); save(store); renderMoveEdit(); });
       box.appendChild(row);
     });
+  }
+  function renderMobility() {
+    screen.innerHTML = `
+      <button class="back" id="mob-back">Back</button>
+      <p class="exhead__idx">Movement</p>
+      <h1 class="exhead__name">Mobility</h1>
+      <p class="exhead__cue">Standing, gym-friendly, no floor. Follow one, then log it — it counts toward your rank like any session.</p>
+      ${MOBILITY.map((m, i) => `
+        <div class="section" style="margin-top:26px">
+          <div class="excard__top"><span class="excard__name" style="font-size:21px">${m.name}</span><span class="excard__scheme">${m.minutes} min</span></div>
+          <div class="demo" data-vid="${m.video}" style="margin-top:12px">
+            <img class="demo__poster" src="https://i.ytimg.com/vi/${m.video}/hqdefault.jpg" alt="" onerror="this.style.display='none'">
+            <div class="demo__play"><span class="demo__playlabel">Play</span></div>
+          </div>
+          <p class="demo__cap">${m.videoTitle}</p>
+          <button class="btn btn--outline" data-logmob="${i}" style="margin-top:12px">Log this · ${m.minutes} min</button>
+        </div>`).join("")}
+      <div style="height:20px"></div>`;
+    document.getElementById("mob-back").addEventListener("click", () => history.back());
+    screen.querySelectorAll(".demo").forEach(d => wireDemo(d));
+    screen.querySelectorAll("[data-logmob]").forEach(b => b.addEventListener("click", () => {
+      const m = MOBILITY[+b.dataset.logmob];
+      store.movement = store.movement || [];
+      store.movement.push({ date: new Date().toISOString(), type: "Mobility", minutes: m.minutes, note: m.name });
+      save(store); buzz(); view = { name: "home" }; render();
+    }));
   }
 
   function renderHome() {
