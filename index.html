@@ -1,282 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="robots" content="noindex, nofollow" />
-  <meta name="theme-color" content="#1c1a17" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Path" />
-  <meta name="mobile-web-app-capable" content="yes" />
-
-  <title>The Path — Training</title>
-
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#17120a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Cairn" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>Cairn</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,400&family=Spectral:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- ===== TOP BAR ===== -->
-  <header class="topbar">
-    <div class="topbar__inner">
-      <a class="topbar__brand" href="#" data-route="home">The Path</a>
-      <nav class="topbar__nav" aria-label="Sessions">
-        <button class="day-pill" data-day="monday">Mon</button>
-        <button class="day-pill" data-day="wednesday">Wed</button>
-        <button class="day-pill" data-day="saturday">Sat</button>
-      </nav>
-    </div>
-    <div class="topbar__progress" aria-hidden="true">
-      <span class="topbar__progress-fill"></span>
-    </div>
-  </header>
+  <!-- Active screen (rendered by app.js per route) -->
+  <main id="screen" class="screen"></main>
 
-  <!-- ===== FIRST-RUN: MARCUS INTRO (one-time) ===== -->
-  <section id="onboard" class="onboard" hidden>
-    <div class="onboard__panel">
-      <p class="onboard__step">Day one</p>
-      <h1 class="onboard__title">I'm Marcus.</h1>
-      <p class="onboard__body">
-        Six weeks. Three days a week — Mon, Wed, Sat. We start light. Joints lead, ego waits. Tendons take longer than muscle to adapt — that's why Phase 1 looks easier than you'd write yourself.
-      </p>
-      <p class="onboard__body">
-        Tap <em>Start session</em> and I'll walk you through, set by set. Auto-rest, swap if a machine's taken, pause whenever. Don't think — just show up.
-      </p>
-      <button class="btn btn--accent btn--block btn--big" id="onboard-go">Let's go</button>
-    </div>
-  </section>
+  <!-- Bottom tab bar -->
+  <nav id="tabbar" class="tabbar" aria-label="Sections" hidden>
+    <button class="tab" data-tab="home">Home</button>
+    <button class="tab" data-tab="train">Train</button>
+  </nav>
 
-  <!-- ===== HOME / SESSION VIEW ===== -->
-  <main id="view-session" class="view view--session">
-    <section class="session-head">
-      <p class="session-head__date" id="session-date"></p>
-      <p class="session-head__week" id="session-week"></p>
-      <h1 class="session-head__title" id="session-title">Today's Session</h1>
-      <p class="session-head__sub" id="session-sub"></p>
-    </section>
-
-    <section class="feel" aria-labelledby="feel-heading">
-      <h2 id="feel-heading" class="feel__title">How does it feel?</h2>
-      <p class="feel__hint">Pick honest. The program adapts.</p>
-      <div class="feel__options" id="feel-options"></div>
-      <p class="feel__note" id="feel-note"></p>
-    </section>
-
-    <section class="start-cta">
-      <button class="btn btn--accent btn--block btn--start" id="start-session">▶ Start session</button>
-      <p class="start-cta__hint">Marcus walks you through, set by set. Auto-rest. Pause / skip / swap anytime.</p>
-    </section>
-
-    <section class="warmup" aria-labelledby="warmup-heading">
-      <h2 id="warmup-heading" class="warmup__title">Warm-up</h2>
-      <p class="warmup__body" id="warmup-body"></p>
-    </section>
-
-    <section class="exercises" aria-label="Today's exercises">
-      <div class="section-meta">
-        <span class="section-meta__label">Lifts</span>
-        <span class="section-meta__count" id="exercise-count"></span>
-      </div>
-      <ol class="exercise-list" id="exercise-list"></ol>
-    </section>
-
-    <section class="session-foot">
-      <button class="btn btn--ghost" id="reset-session">Reset today</button>
-      <button class="btn btn--solid" id="finish-session">Finish session</button>
-    </section>
-  </main>
-
-  <!-- ===== EXERCISE DETAIL ===== -->
-  <main id="view-exercise" class="view view--exercise" hidden>
-    <button class="back-link" id="back-to-session" aria-label="Back to session">&larr; Back</button>
-
-    <header class="ex-head">
-      <p class="ex-head__index" id="ex-index"></p>
-      <h1 class="ex-head__title" id="ex-title"></h1>
-      <p class="ex-head__cue" id="ex-cue"></p>
-    </header>
-
-    <section class="ex-video">
-      <div class="ex-video__frame" id="ex-video-frame"></div>
-      <p class="ex-video__caption" id="ex-video-caption"></p>
-    </section>
-
-    <section class="ex-target">
-      <div class="ex-target__row">
-        <span class="ex-target__label">Target</span>
-        <span class="ex-target__value" id="ex-target-value"></span>
-      </div>
-      <div class="ex-target__row">
-        <span class="ex-target__label">Last session</span>
-        <span class="ex-target__value" id="ex-last-value">—</span>
-      </div>
-    </section>
-
-    <section class="logger" aria-label="Set logger">
-      <h2 class="logger__title">Log sets</h2>
-      <div class="logger__sets" id="logger-sets"></div>
-    </section>
-
-    <section class="swaps" id="swaps-section">
-      <h2 class="swaps__title">Need to swap?</h2>
-      <p class="swaps__hint">Marcus pre-approved these for this exercise.</p>
-      <div class="swaps__list" id="swaps-list"></div>
-    </section>
-
-    <section class="feedback" id="feedback-section">
-      <h2 class="feedback__title">How did this lift go?</h2>
-      <p class="feedback__hint">Tap any that apply. Saved. You'll see it next time.</p>
-      <div class="feedback__group" data-cat="feel">
-        <span class="feedback__cat">Feel</span>
-        <div class="feedback__chips" id="feedback-chips-feel"></div>
-      </div>
-      <div class="feedback__group" data-cat="friction">
-        <span class="feedback__cat">Friction</span>
-        <div class="feedback__chips" id="feedback-chips-friction"></div>
-      </div>
-      <label class="feedback__note-label" for="feedback-note">Note (optional)</label>
-      <textarea class="feedback__note" id="feedback-note" rows="2" placeholder="One line — what stood out, what to remember next time."></textarea>
-      <p class="feedback__last" id="feedback-last"></p>
-    </section>
-
-    <section class="ex-foot">
-      <button class="btn btn--ghost" id="ex-mark-done">Done</button>
-    </section>
-  </main>
-
-  <!-- ===== GUIDED SESSION ===== -->
-  <main id="view-guided" class="view view--guided" hidden>
-    <header class="guided-bar-wrap">
-      <div class="guided-bar">
-        <button class="guided-bar__exit" id="guided-exit" aria-label="Exit guided">✕</button>
-        <div class="guided-bar__progress" aria-hidden="true">
-          <span class="guided-bar__progress-fill" id="guided-progress-fill"></span>
-        </div>
-        <button class="guided-bar__pause" id="guided-pause" aria-label="Pause">⏸</button>
-      </div>
-      <p class="guided-bar__preview" id="guided-bar-preview"></p>
-    </header>
-
-    <!-- Active set state -->
-    <section class="guided guided--active" id="guided-active">
-      <p class="guided__step" id="guided-step"></p>
-      <h1 class="guided__title" id="guided-title"></h1>
-      <p class="guided__cue" id="guided-cue"></p>
-
-      <div class="guided__set">
-        <p class="guided__set-label" id="guided-set-label"></p>
-        <div class="guided__inputs">
-          <div class="guided-input">
-            <button class="guided-input__btn" data-gstep="-2.5" aria-label="-2.5 kg">−</button>
-            <input class="guided-input__field" type="number" inputmode="decimal" step="2.5" id="guided-weight" placeholder="kg" />
-            <span class="guided-input__suffix">kg</span>
-            <button class="guided-input__btn" data-gstep="2.5" aria-label="+2.5 kg">+</button>
-          </div>
-          <div class="guided-input">
-            <button class="guided-input__btn" data-grstep="-1" aria-label="-1 rep">−</button>
-            <input class="guided-input__field" type="number" inputmode="numeric" step="1" id="guided-reps" placeholder="reps" />
-            <span class="guided-input__suffix">rep</span>
-            <button class="guided-input__btn" data-grstep="1" aria-label="+1 rep">+</button>
-          </div>
-        </div>
-        <p class="guided__hint" id="guided-hint"></p>
-        <button class="btn btn--accent btn--block btn--big" id="guided-log">Log set</button>
-      </div>
-
-      <div class="guided__quickactions">
-        <button class="guided-action" id="guided-skip-ex">Skip exercise</button>
-        <button class="guided-action" id="guided-swap">Swap</button>
-        <button class="guided-action" id="guided-show-video">Watch demo</button>
-      </div>
-    </section>
-
-    <!-- Rest state -->
-    <section class="guided guided--rest" id="guided-rest" hidden>
-      <p class="guided__step">Rest</p>
-      <p class="guided-rest__time" id="guided-rest-time">2:00</p>
-      <p class="guided-rest__next" id="guided-rest-next"></p>
-      <p class="guided-rest__cue" id="guided-rest-cue"></p>
-      <div class="guided-rest__actions">
-        <button class="guided-action" data-grest-adjust="-15">−15</button>
-        <button class="btn btn--solid btn--block btn--big" id="guided-rest-skip">Skip rest</button>
-        <button class="guided-action" data-grest-adjust="+15">+15</button>
-      </div>
-    </section>
-
-    <!-- Transition state (between exercises) -->
-    <section class="guided guided--transition" id="guided-transition" hidden>
-      <p class="guided__step" id="guided-trans-prev"></p>
-      <h2 class="guided-trans__next-label">Next up</h2>
-      <h1 class="guided__title" id="guided-trans-title"></h1>
-      <p class="guided__cue" id="guided-trans-cue"></p>
-      <p class="guided-trans__meta" id="guided-trans-meta"></p>
-      <div class="guided-trans__actions">
-        <button class="btn btn--accent btn--block btn--big" id="guided-trans-go">Start →</button>
-        <div class="guided__quickactions">
-          <button class="guided-action" id="guided-trans-skip">Skip exercise</button>
-          <button class="guided-action" id="guided-trans-swap">Swap</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Pause overlay -->
-    <section class="guided guided--paused" id="guided-paused" hidden>
-      <p class="guided__step">Paused</p>
-      <h1 class="guided__title">Take your time.</h1>
-      <p class="guided__cue">Nothing's lost. Resume when you're ready.</p>
-      <div class="guided-paused__actions">
-        <button class="btn btn--accent btn--block btn--big" id="guided-resume">Resume</button>
-        <button class="guided-action" id="guided-end-early">End session</button>
-      </div>
-    </section>
-
-    <!-- Inline video (collapsed by default) -->
-    <section class="guided__video" id="guided-video-wrap" hidden>
-      <div class="guided__video-frame" id="guided-video-frame"></div>
-      <button class="guided-action" id="guided-hide-video">Hide demo</button>
-    </section>
-  </main>
-
-  <!-- ===== REST TIMER OVERLAY ===== -->
-  <div id="rest-timer" class="rest">
+  <!-- Rest timer overlay (shared) -->
+  <div id="rest" class="rest" hidden>
     <div class="rest__panel">
       <p class="rest__label">Rest</p>
       <p class="rest__time" id="rest-time">2:00</p>
+      <p class="rest__next" id="rest-next"></p>
       <div class="rest__actions">
-        <button class="rest__btn" data-rest-adjust="-15">&minus;15</button>
+        <button class="rest__btn" data-rest="-15">&minus;15</button>
         <button class="rest__btn rest__btn--skip" id="rest-skip">Skip</button>
-        <button class="rest__btn" data-rest-adjust="+15">&plus;15</button>
+        <button class="rest__btn" data-rest="30">&plus;30</button>
       </div>
     </div>
   </div>
 
-  <!-- ===== FINISH SUMMARY ===== -->
-  <main id="view-finish" class="view view--finish" hidden>
-    <section class="finish">
-      <p class="finish__date" id="finish-date"></p>
-      <h1 class="finish__title">Done.</h1>
-      <p class="finish__sub" id="finish-sub"></p>
-
-      <div class="finish__notes">
-        <label for="finish-note" class="finish__label">How did it go?</label>
-        <textarea id="finish-note" class="finish__textarea" placeholder="One line is enough. Energy, joints, anything Marcus should know."></textarea>
-      </div>
-
-      <button class="btn btn--solid btn--block" id="finish-save">Save &amp; close</button>
-      <button class="btn btn--ghost btn--block" id="finish-back">Back to session</button>
-    </section>
-  </main>
-
   <script src="data/program.js"></script>
   <script src="app.js"></script>
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
-      });
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
     }
   </script>
 </body>

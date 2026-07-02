@@ -1,55 +1,54 @@
-/* Service worker — offline shell for The Path training PWA */
-const CACHE = "thepath-training-v11";
-const SHELL = [
+// Cairn — service worker. Offline-first for the app shell.
+const CACHE = "cairn-v2-025";
+const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./data/program.js",
   "./manifest.json",
-  "./icons/icon.svg"
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/apple-touch-icon.png",
+  "./icons/cairn-outline.png"
 ];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
-  );
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-  // Network-first for the HTML doc so updates land fast; cache-first for static assets.
-  const url = new URL(req.url);
-  const isYouTube = url.hostname.endsWith("youtube.com") || url.hostname.endsWith("youtube-nocookie.com") || url.hostname.endsWith("ytimg.com");
-  if (isYouTube) return; // let the network handle video embeds
-  if (req.mode === "navigate" || req.destination === "document") {
-    event.respondWith(
-      fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
-        return res;
-      }).catch(() => caches.match(req).then(r => r || caches.match("./index.html")))
+self.addEventListener("fetch", (e) => {
+  if (e.request.method !== "GET") return;
+  const url = new URL(e.request.url);
+  // Google Fonts (CSS + woff2): CACHE-FIRST so the editorial type works offline after one online load.
+  if (url.host === "fonts.googleapis.com" || url.host === "fonts.gstatic.com") {
+    e.respondWith(
+      caches.match(e.request).then((hit) =>
+        hit || fetch(e.request).then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+          return res;
+        }).catch(() => hit)
+      )
     );
     return;
   }
-  event.respondWith(
-    caches.match(req).then(cached =>
-      cached || fetch(req).then(res => {
-        if (res && res.status === 200 && res.type === "basic") {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached)
-    )
+  // Non-same-origin (YouTube etc.) — straight to network.
+  if (url.origin !== self.location.origin) return;
+  // Same-origin: NETWORK-FIRST so updates land immediately when online; fall back to cache offline.
+  e.respondWith(
+    fetch(e.request).then((res) => {
+      const copy = res.clone();
+      caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+      return res;
+    }).catch(() => caches.match(e.request).then((hit) => hit || caches.match("./index.html")))
   );
 });

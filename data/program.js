@@ -9,14 +9,14 @@ const EXERCISE_LIBRARY = {
     cue: "Feet just outside hip width, dumbbell at chest. Sit between your hips, not back. Knees track over your middle toes. Drive through the whole foot.",
     video: "t__Um6KjJkc",
     videoTitle: "PERFECT Goblet Squat Form",
-    swaps: ["leg_press", "wall_sit"]
+    swaps: ["leg_press", "wall_sit", "db_rdl"]
   },
   leg_press: {
     name: "Leg Press",
     cue: "Feet shoulder-width on the platform, mid-foot. Lower under control until knees ~90°. Drive through heels — don't lock out at the top.",
     video: "nDh_BlnLCGc",
     videoTitle: "How To Leg Press With Perfect Technique",
-    swaps: ["goblet_squat", "wall_sit"]
+    swaps: ["goblet_squat", "wall_sit", "db_rdl"]
   },
   lat_pulldown: {
     name: "Lat Pulldown",
@@ -30,7 +30,7 @@ const EXERCISE_LIBRARY = {
     cue: "Flat bench, feet planted. Dumbbells over chest, lower to nipple line. Wrists stacked over elbows. Press up and slightly together.",
     video: "1V3vpcaxRYQ",
     videoTitle: "Best Dumbbell Bench Press Tutorial",
-    swaps: ["incline_db_press", "machine_chest_press", "pushup"]
+    swaps: ["incline_db_press", "machine_chest_press"]
   },
   incline_db_press: {
     name: "Dumbbell Incline Press",
@@ -60,13 +60,6 @@ const EXERCISE_LIBRARY = {
     videoTitle: "Get NOTICEABLY BIGGER Calves",
     swaps: ["seated_calf_raise"]
   },
-  plank: {
-    name: "Plank",
-    cue: "Forearms down, elbows under shoulders. Squeeze glutes, brace abs like you're about to take a punch. Don't sag, don't pike. 20 seconds is plenty week 1.",
-    video: "hoeNgjheDHk",
-    videoTitle: "How to Do a Plank",
-    swaps: ["dead_bug"]
-  },
   bicep_curl: {
     name: "Dumbbell Bicep Curl",
     cue: "Standing, dumbbells at sides. Elbows pinned to your ribs. Curl up — don't swing. Squeeze at the top, lower slow on the way down (3 seconds).",
@@ -88,13 +81,6 @@ const EXERCISE_LIBRARY = {
     videoTitle: "The PERFECT Dumbbell Romanian Deadlift",
     swaps: ["leg_press", "good_morning"]
   },
-  dead_bug: {
-    name: "Dead Bug",
-    cue: "On your back. Arms up, knees over hips at 90°. Lower opposite arm + leg slowly — keep your lower back PRESSED into the floor. Speed isn't the point. Control is.",
-    video: "Aoipu_fl3HA",
-    videoTitle: "The Dead Bug Exercise For Beginners",
-    swaps: ["plank"]
-  },
 
   // ===== Substitution-only exercises (used via swap pills) =====
   wall_sit: {
@@ -109,14 +95,7 @@ const EXERCISE_LIBRARY = {
     cue: "Seat adjusted so handles are at mid-chest. Thumbless grip. Press in a slight upward arc — don't lock out. Control the negative.",
     video: "Qu7-ceCvq7w",
     videoTitle: "The PERFECT Machine Chest Press",
-    swaps: ["db_bench_press", "incline_db_press", "pushup"]
-  },
-  pushup: {
-    name: "Push-up",
-    cue: "Hands just outside shoulder width. Body in one line — don't sag, don't pike. Lower chest to a fist's height off the floor. If too hard: hands on a bench.",
-    video: "-m9buxRuWEc",
-    videoTitle: "How To Do A Push Up",
-    swaps: ["db_bench_press", "machine_chest_press"]
+    swaps: ["db_bench_press", "incline_db_press"]
   },
   assisted_pullup: {
     name: "Assisted Pull-up",
@@ -285,3 +264,14 @@ const FEEL_OPTIONS = [
     loadModifier: 0.8
   }
 ];
+
+// Conservative day-one starting weights (kg) so the weight field is never blank.
+// Beginner / joint-safe for a deconditioned lifter; DB values are per hand, machine/cable are the stack.
+// A floor to adjust up from, not a prescription — tune per how it feels.
+const STARTING_WEIGHTS = {
+  goblet_squat: 8, leg_press: 40, lat_pulldown: 25, db_bench_press: 10, incline_db_press: 8,
+  seated_cable_row: 25, db_shoulder_press: 6, calf_raise: 0, bicep_curl: 6, tricep_pushdown: 10,
+  db_rdl: 6, wall_sit: 0, machine_chest_press: 20, machine_row: 25, machine_shoulder_press: 15,
+  lateral_raise: 4, seated_calf_raise: 10, hammer_curl: 6, cable_curl: 10, overhead_tricep_extension: 6,
+  good_morning: 6, suitcase_carry: 12, pallof_press: 10, bike_finisher: 0
+};
