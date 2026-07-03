@@ -562,29 +562,52 @@
   }
 
   function renderHomeZero(day, title) {
+    const prog = PROGRAM[day] || {}; const exCount = (prog.exercises || []).length;
     screen.innerHTML = `
-      <div class="home__top"><span class="home__brand">Cairn</span><span class="kicker">Next up · ${DAY_SHORT[day]}</span></div>
-      <div class="zero">
-        <p class="kicker">Rank</p>
-        <h1 class="rank__tier">Bronze</h1>
-        <div class="meter"><span class="meter__fill" style="width:0"></span></div>
-        <div class="rank__row"><span class="rank__pts">0 points</span><span class="rank__next"><b>300 to Iron</b></span></div>
-        <p class="zero__line" style="margin-top:30px">This is the starting line.</p>
-        <p class="zero__sub">Six weeks, three days a week — you, Faisal, and Yazan. Log your first set and the journey starts filling in: rank, volume, every personal best.</p>
+      <div class="home__top"><span class="home__brand">Cairn</span><span class="kicker">${fmtDate(new Date().toISOString())}</span></div>
+
+      <div class="nh-hero-wrap" id="hero-wrap">
+        <div class="nh-hero">
+          ${rankStackSVG()}
+          <div class="nh-rk">
+            <p class="kicker">Your standing</p>
+            <h1 class="rank__tier">Bronze</h1>
+            <div class="meter"><span class="meter__fill" style="width:0"></span></div>
+            <p class="rank__pts" style="margin-top:10px">0 points · <b style="color:var(--acc);font-weight:400">300 to Iron</b></p>
+            <span class="nh-climb" id="climb">See the climb <span class="nh-chev">›</span></span>
+          </div>
+        </div>
+        <div class="nh-hladder">
+          <div class="ladder">${TIERS.map((t, i) => `<div class="ladder__row ${i === 0 ? "is-cur" : ""}"><span class="ladder__n">${t.n}</span><span class="ladder__p">${t.min} pts</span></div>`).join("")}</div>
+        </div>
       </div>
-      <div class="start" style="margin-top:30px">
-        <div class="start__meta"><span class="start__day">${title.split(" — ")[0]}</span><span class="start__sub">${(title.split(" — ")[1] || "")}</span></div>
-        <button class="btn btn--solid" id="start-btn">Start session one</button>
+
+      <div class="nh-card">
+        <div class="ct">Start · ${DAY_SHORT[day]}</div>
+        <div class="cs">${exCount} exercises · your first session</div>
+        <button class="btn btn--solid" id="start-btn" style="margin-top:14px">Start session one</button>
       </div>
-      ${bwSection()}
-      ${moveSection()}
-      <div class="section">
-        <div class="section__head"><span class="section__title">Rank ladder</span></div>
-        <div class="ladder">${TIERS.map((t, i) => `<div class="ladder__row ${i === 0 ? "is-cur" : ""}"><span class="ladder__n">${t.n}</span><span class="ladder__p">${t.min} pts</span></div>`).join("")}</div>
-      </div>`;
+
+      <p class="zero__line" style="margin-top:26px">This is the starting line.</p>
+      <p class="zero__sub">Log your first set — or just your weight — and it all begins filling in: rank, the climb, every personal best.</p>
+
+      <div class="nh-grid">
+        <button class="nh-tile wide" id="bw-tile"><div class="nh-th"><span>Bodyweight · your #1</span><span class="nh-go">＋</span></div><div class="nh-sub" style="margin-top:10px">The number that matters most to you. Tap to log your first weigh-in.</div></button>
+      </div>
+
+      <div class="nh-sect">
+        <div class="nh-shead"><span class="l">Log</span></div>
+        <button class="nh-logrow" id="log-move-row"><div><div class="lt">Movement</div><div class="ls">a run, a match, a walk, a yoga flow</div></div><span class="nh-go">＋</span></button>
+        <button class="nh-logrow" id="log-mob-row"><div><div class="lt">Mobility flow</div><div class="ls">standing videos · no floor</div></div><span class="nh-go">›</span></button>
+      </div>
+
+      <div class="foot"><span class="foot__link">Cairn</span><button class="foot__link" id="settings-btn">Settings</button></div>`;
     document.getElementById("start-btn").addEventListener("click", () => startSession(day));
-    wireBodyweight();
-    wireMovement();
+    document.getElementById("climb").addEventListener("click", () => document.getElementById("hero-wrap").classList.toggle("open"));
+    document.getElementById("settings-btn").addEventListener("click", () => go({ name: "settings", back: { name: "home" } }));
+    document.getElementById("bw-tile").addEventListener("click", () => go({ name: "bwEdit", back: { name: "home" } }));
+    document.getElementById("log-move-row").addEventListener("click", () => go({ name: "moveEdit", back: { name: "home" } }));
+    document.getElementById("log-mob-row").addEventListener("click", () => go({ name: "mobility", back: { name: "home" } }));
   }
 
   // ---------- TRAIN (session overview) ----------
