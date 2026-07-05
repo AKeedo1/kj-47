@@ -183,49 +183,62 @@ const EXERCISE_LIBRARY = {
   }
 };
 
+// PROGRAM v2 (2026-07-05): each day = 4 fixed ANCHORS (two superset pairs, ss A/B — the progression drivers)
+// + 2 ACCESSORIES drawn from a per-day pool that ROTATES weekly (ss C — the novelty slot). 6 moves/session, ~45 min.
+// Anchors within a pair share equal set counts. Bike/cardio moved out — log it via the Movement feature instead.
 const PROGRAM = {
   monday: {
     title: "Lower — Legs & full body",
-    subtitle: "Full body, lower-body focus.",
-    exercises: [
-      { id: "goblet_squat", sets: 3, reps: "10", target: "8 kg DB to start" },
-      { id: "leg_press", sets: 3, reps: "12", target: "Pick a weight you could do 20 with — only do 12" },
-      { id: "lat_pulldown", sets: 3, reps: "10", target: "RPE 6 — 4 reps in the tank" },
-      { id: "db_bench_press", sets: 3, reps: "10", target: "RPE 6" },
-      { id: "seated_cable_row", sets: 3, reps: "10", target: "RPE 6" },
-      { id: "calf_raise", sets: 3, reps: "15", target: "Bodyweight or light DB" },
-      { id: "suitcase_carry", sets: 3, reps: "20 paces each side", target: "Heavy DB, one hand. Stand tall — don't lean." },
-      { id: "bike_finisher", sets: 1, reps: "15-20 min", target: "Optional. Skip weeks 1-2. Add from week 3." }
-    ]
+    subtitle: "Two superset pairs + a rotating finisher.",
+    anchors: [
+      { id: "goblet_squat", sets: 3, reps: "8-10", target: "Sit between the hips, drive through the whole foot. Leave 2-3 in the tank.", ss: "A" },
+      { id: "db_bench_press", sets: 3, reps: "8-10", target: "Lower to nipple line, press up and slightly together.", ss: "A" },
+      { id: "leg_press", sets: 3, reps: "12", target: "A weight you could do 20 with — stop at 12. Don't lock out.", ss: "B" },
+      { id: "seated_cable_row", sets: 3, reps: "10", target: "Pull to the lower ribs, squeeze the blades.", ss: "B" }
+    ],
+    accessories: [
+      { id: "calf_raise", sets: 2, reps: "15", target: "Full range, pause 1s at the top." },
+      { id: "suitcase_carry", sets: 2, reps: "20 paces each side", target: "Heavy, one hand. Stand tall — don't lean." },
+      { id: "pallof_press", sets: 2, reps: "8 each side", target: "Resist the twist. 2s hold." },
+      { id: "lateral_raise", sets: 2, reps: "12", target: "Light. Lead with the elbows, pinkies up." }
+    ],
+    accPerWeek: 2
   },
   wednesday: {
     title: "Upper — Push, pull, arms",
-    subtitle: "Full body, upper-body focus.",
-    exercises: [
-      { id: "incline_db_press", sets: 3, reps: "10", target: "Bench at 30°. Start light." },
-      { id: "lat_pulldown", sets: 3, reps: "10", target: "Same as Monday" },
-      { id: "db_shoulder_press", sets: 3, reps: "8", target: "Start with 5-6 kg DBs" },
-      { id: "seated_cable_row", sets: 3, reps: "10", target: "Same as Monday" },
-      { id: "goblet_squat", sets: 2, reps: "10", target: "Maintenance — same load as Monday" },
-      { id: "bicep_curl", sets: 2, reps: "12", target: "Superset with tricep pushdown" },
-      { id: "tricep_pushdown", sets: 2, reps: "12", target: "Superset with bicep curl" },
-      { id: "suitcase_carry", sets: 3, reps: "20 paces each side", target: "Heavy DB, one hand. Stand tall — don't lean." },
-      { id: "bike_finisher", sets: 1, reps: "15-20 min", target: "Optional. Skip weeks 1-2. Add from week 3." }
-    ]
+    subtitle: "Two superset pairs + a rotating arm finisher.",
+    anchors: [
+      { id: "incline_db_press", sets: 3, reps: "8-10", target: "30° bench. Press up and slightly in.", ss: "A" },
+      { id: "lat_pulldown", sets: 3, reps: "10", target: "Elbows down toward the ribs, not the bar to the chest.", ss: "A" },
+      { id: "db_shoulder_press", sets: 3, reps: "8", target: "Elbows ~45°, press in a slight arc. Don't lock hard.", ss: "B" },
+      { id: "machine_row", sets: 3, reps: "10", target: "Chest pinned to the pad. Drive the elbows back.", ss: "B" }
+    ],
+    accessories: [
+      { id: "bicep_curl", sets: 2, reps: "12", target: "Elbows pinned, slow on the way down." },
+      { id: "tricep_pushdown", sets: 2, reps: "12", target: "Elbows still, push down to lockout." },
+      { id: "hammer_curl", sets: 2, reps: "12", target: "Neutral grip, no swing." },
+      { id: "cable_curl", sets: 2, reps: "12", target: "Constant tension, full range." },
+      { id: "overhead_tricep_extension", sets: 2, reps: "12", target: "Elbows by the ears, full stretch." },
+      { id: "lateral_raise", sets: 2, reps: "12", target: "Light. Lead with the elbows." }
+    ],
+    accPerWeek: 2
   },
   saturday: {
     title: "Hinge — Hips & core",
-    subtitle: "Full body, hip-hinge focus.",
-    exercises: [
-      { id: "goblet_squat", sets: 3, reps: "10", target: "Same load as Mon/Wed" },
-      { id: "db_rdl", sets: 3, reps: "10", target: "LIGHT — 6-8 kg DBs. Form work, not strength." },
-      { id: "lat_pulldown", sets: 3, reps: "10", target: "RPE 6" },
-      { id: "db_bench_press", sets: 3, reps: "10", target: "Flat bench. RPE 6." },
-      { id: "seated_cable_row", sets: 3, reps: "10", target: "RPE 6" },
-      { id: "calf_raise", sets: 3, reps: "15", target: "Bodyweight or light DB" },
-      { id: "pallof_press", sets: 3, reps: "8 each side", target: "Cable at chest height. 2-second hold each rep." },
-      { id: "bike_finisher", sets: 1, reps: "15-20 min", target: "Optional. Skip weeks 1-2. Add from week 3." }
-    ]
+    subtitle: "Two superset pairs + a rotating finisher.",
+    anchors: [
+      { id: "db_rdl", sets: 3, reps: "10", target: "Hips back, DBs slide down the thighs, flat back. Feel the hamstrings.", ss: "A" },
+      { id: "db_bench_press", sets: 3, reps: "10", target: "Flat bench, controlled.", ss: "A" },
+      { id: "goblet_squat", sets: 3, reps: "10", target: "Same load as your other days.", ss: "B" },
+      { id: "lat_pulldown", sets: 3, reps: "10", target: "Leave 2-3 in the tank.", ss: "B" }
+    ],
+    accessories: [
+      { id: "pallof_press", sets: 2, reps: "8 each side", target: "Resist the twist. 2s hold." },
+      { id: "calf_raise", sets: 2, reps: "15", target: "Full range, pause at the top." },
+      { id: "good_morning", sets: 2, reps: "10", target: "Light. Hinge, flat back, feel the hamstrings." },
+      { id: "suitcase_carry", sets: 2, reps: "20 paces each side", target: "Heavy, one hand. Stand tall." }
+    ],
+    accPerWeek: 2
   }
 };
 

@@ -100,7 +100,7 @@
   function getSession(s, day) {
     const k = dateKey(day);
     if (!s.sessions[k]) {
-      s.sessions[k] = { day, date: new Date().toISOString(), feel: null, joint: null, crew: { Faisal: false, Yazan: false }, swaps: {}, exercises: {}, completedAt: null };
+      s.sessions[k] = { day, date: new Date().toISOString(), week: programWeek(), feel: null, joint: null, crew: { Faisal: false, Yazan: false }, swaps: {}, exercises: {}, completedAt: null };
       save(s);
     }
     return { key: k, session: s.sessions[k] };
@@ -132,6 +132,19 @@
     return i === -1 ? "monday" : ROTATION[(i + 1) % ROTATION.length];
   }
   function plannedDay() { return dayPick || nextInRotation(); }
+
+  // ---------- program assembly: anchors fixed (ss A/B), accessories rotate weekly (ss C) ----------
+  function weekFor(day) { const s = store.sessions[dateKey(day)]; return (s && s.week) ? s.week : programWeek(); }
+  function weekAccessories(day) {
+    const d = PROGRAM[day]; if (!d || !d.accessories || !d.accessories.length) return [];
+    const pool = d.accessories, per = Math.min(d.accPerWeek || 2, pool.length);
+    const start = ((weekFor(day) - 1) * per) % pool.length, out = [];
+    for (let i = 0; i < per; i++) out.push(Object.assign({}, pool[(start + i) % pool.length], { ss: "C" }));
+    return out;
+  }
+  function progFor(day) { const d = PROGRAM[day]; if (!d) return null; return { title: d.title, subtitle: d.subtitle, exercises: (d.anchors || []).concat(weekAccessories(day)) }; }
+  function allProgExercises(day) { const d = PROGRAM[day] || {}; return (d.anchors || []).concat(d.accessories || []); }
+  function ssPartnerIdx(exs, idx) { const g = exs[idx] && exs[idx].ss; if (!g) return -1; for (let j = 0; j < exs.length; j++) if (j !== idx && exs[j] && exs[j].ss === g) return j; return -1; }
 
   // ---------- derivation (pure over store) ----------
   const epley = (w, r) => { w = +w || 0; r = +r || 0; return r > 0 ? w * (1 + r / 30) : w; };
@@ -462,7 +475,7 @@
     let crewStreak = 0; for (const s of doneDesc) { if (s.crew && (s.crew.Faisal || s.crew.Yazan)) crewStreak++; else break; }
     const resume = store.current && store.sessions[store.current] && !store.sessions[store.current].completedAt && isDone(store.sessions[store.current]);
     const startDay = resume ? store.sessions[store.current].day : plannedDay();
-    const prog = PROGRAM[startDay] || {}; const exCount = (prog.exercises || []).length;
+    const prog = progFor(startDay) || {}; const exCount = (prog.exercises || []).length;
 
     if (d.sessions === 0 && !resume && !(store.bodyweight || []).length && !(store.movement || []).length) { renderHomeZero(startDay, (prog.title || "Session")); return; }
 
@@ -562,7 +575,7 @@
   }
 
   function renderHomeZero(day, title) {
-    const prog = PROGRAM[day] || {}; const exCount = (prog.exercises || []).length;
+    const prog = progFor(day) || {}; const exCount = (prog.exercises || []).length;
     screen.innerHTML = `
       <div class="home__top"><span class="home__brand">Cairn</span><span class="kicker">${fmtDate(new Date().toISOString())}</span></div>
 
@@ -626,7 +639,7 @@
 
   function renderTrain() {
     const day = currentDay();
-    const prog = PROGRAM[day]; if (!prog) { view = { name: "home" }; renderHome(); return; }
+    const prog = progFor(day); if (!prog) { view = { name: "home" }; renderHome(); return; }
     const { session } = getSession(store, day);
     const active = !!(store.current && store.sessions[store.current] && store.sessions[store.current].day === day && !store.sessions[store.current].completedAt);
 
@@ -666,8 +679,11 @@
           const lastStr = last ? "Last: " + last.map(x => `${fmtN(x.weight)}×${x.reps}`).join(", ") : "First time";
           const flagged = session.feel === "joints" && session.joint && (JOINT_LOAD[session.joint] || []).includes(exId);
           const scheme = st.completed ? '<span class="excard__check">done</span>' : schemeLine(ex, st);
+          const _pi = ssPartnerIdx(prog.exercises, i);
+          const _pn = _pi !== -1 ? (EXERCISE_LIBRARY[effId(session, _pi, prog.exercises[_pi])] || {}).name : "";
           return `<button class="excard ${st.completed ? "is-done" : ""}" data-ex="${i}">
             <div class="excard__top"><span class="excard__name">${lib.name}${exId !== ex.id ? ' <span class="sw">swap</span>' : ""}</span><span class="excard__scheme">${scheme}</span></div>
+            ${_pn ? `<div class="excard__last" style="opacity:.6">Superset — pair with ${_pn}, rest once after both</div>` : ""}
             <div class="excard__last">${lastStr}</div>
             ${!st.completed && st.reason ? `<div class="coach">${st.reason}</div>` : ""}
             ${flagged ? `<div class="excard__last accent">Ease off or swap — ${session.joint.toLowerCase()} flagged today</div>` : ""}
@@ -709,7 +725,7 @@
     return out;
   }
   function findEx(exId) {
-    for (const day of ["monday", "wednesday", "saturday"]) { const f = (PROGRAM[day].exercises || []).find(e => e.id === exId); if (f) return f; }
+    for (const day of ["monday", "wednesday", "saturday"]) { const f = allProgExercises(day).find(e => e.id === exId); if (f) return f; }
     return { id: exId, reps: "10", sets: 3, target: "" };
   }
   function lineChart(vals) {
@@ -770,7 +786,7 @@
   }
   function renderSessionEdit(key) {
     const se = store.sessions[key]; if (!se) { view = { name: "home" }; render(); return; }
-    const prog = PROGRAM[se.day] || { title: se.day, exercises: [] };
+    const prog = progFor(se.day) || { title: se.day, exercises: [] };
     const exIds = Object.keys(se.exercises || {}).filter(exId => (se.exercises[exId].sets || []).some(s => s.done));
     screen.innerHTML = `
       <button class="back" id="se-back">Back</button>
@@ -845,7 +861,7 @@
 
   // ---------- EXERCISE detail ----------
   function renderExercise(idx) {
-    const day = currentDay(); const prog = PROGRAM[day]; const ex = prog.exercises[idx];
+    const day = currentDay(); const prog = progFor(day); const ex = prog.exercises[idx];
     const { session } = getSession(store, day); const exId = effId(session, idx, ex); const lib = EXERCISE_LIBRARY[exId];
     const last = lastPerformance(store, exId);
     ensureSets(session, exId, ex.sets, last, ex);
@@ -952,7 +968,7 @@
 
   // ---------- GUIDED runner ----------
   function startGuided() {
-    const day = currentDay(); const prog = PROGRAM[day]; const { session } = getSession(store, day);
+    const day = currentDay(); const prog = progFor(day); const { session } = getSession(store, day);
     if (!session.startedAt) { session.startedAt = new Date().toISOString(); save(store); }
     primeAudio();
     // first incomplete exercise / set
@@ -970,7 +986,7 @@
 
   function renderGuided() {
     if (!guided) { view = { name: "train" }; renderTrain(); return; }
-    const { day } = guided; const prog = PROGRAM[day]; const { session } = getSession(store, day);
+    const { day } = guided; const prog = progFor(day); const { session } = getSession(store, day);
     if (guided.exIdx >= prog.exercises.length) return finishSession();
     const ex = prog.exercises[guided.exIdx]; const exId = effId(session, guided.exIdx, ex); const lib = EXERCISE_LIBRARY[exId];
     ensureSets(session, exId, ex.sets, lastPerformance(store, exId), ex);
@@ -981,6 +997,9 @@
     const set = st.sets[guided.setIdx];
     const feeler = guided.setIdx === 0;
     const total = prog.exercises.length;
+    const _gpi = ssPartnerIdx(prog.exercises, guided.exIdx);
+    const _gpn = _gpi !== -1 ? (EXERCISE_LIBRARY[effId(session, _gpi, prog.exercises[_gpi])] || {}).name : "";
+    const ssNote = _gpn ? `<p class="gcue" style="opacity:.7">Superset with ${_gpn} — alternate the two and rest once after both, for a faster session.</p>` : "";
     const frac = (guided.exIdx + guided.setIdx / Math.max(1, ex.sets)) / total;
     const repLabel = ex.id === "bike_finisher" ? ex.reps : (/each side|paces/i.test(ex.reps) ? ex.reps : (st.rxReps || ex.reps) + " reps");
 
@@ -990,6 +1009,7 @@
         <p class="gstep">Exercise ${guided.exIdx + 1} of ${total}</p>
         <h1 class="gname">${lib.name}</h1>
         <p class="gcue">${lib.cue}</p>
+        ${ssNote}
         <div class="gdemo" id="g-demo" hidden></div>
         <div class="gset">
           ${feeler ? `<p class="gfeeler">Feeler set — ramp up, lighter</p>` : ""}
@@ -1057,7 +1077,7 @@
   function updateBestRank(d) { if (d.tierIdx > (store.bestRankIdx || 0)) { store.bestRankIdx = d.tierIdx; save(store); } }
 
   function renderFinish() {
-    const day = view.day; const prog = PROGRAM[day] || { title: "Session" };
+    const day = view.day; const prog = progFor(day) || { title: "Session" };
     const d = derive(store); updateBestRank(d);
     const { session } = getSession(store, day);
     const sets = doneSets(session).length;
