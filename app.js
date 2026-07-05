@@ -521,6 +521,11 @@
         <button class="btn btn--solid" id="start-btn" style="margin-top:14px">${resume ? "Resume session" : "Start guided session"}</button>
       </div>
 
+      <div class="nh-sect">
+        <div class="nh-shead"><span class="l">Workouts</span><span class="r">tap to view</span></div>
+        ${ROTATION.map(dk => `<button class="nh-logrow" data-day="${dk}"><div><div class="lt">${DAY_SHORT[dk]}${dk === startDay ? " · next" : ""}</div><div class="ls">${(PROGRAM[dk].title.split(" — ")[1] || "").trim()} · ${progFor(dk).exercises.length} moves</div></div><span class="nh-go">›</span></button>`).join("")}
+      </div>
+
       <div class="nh-grid">
         ${bwTile}
         <div class="nh-tile"><div class="nh-th"><span>This week</span><span style="color:var(--acc)">${d.thisWeek}/3</span></div><div class="nh-dots">${dots}</div></div>
@@ -582,6 +587,7 @@
     const lmr = document.getElementById("log-move-row"); if (lmr) lmr.addEventListener("click", () => go({ name: "moveEdit", back: { name: "home" } }));
     const lmb = document.getElementById("log-mob-row"); if (lmb) lmb.addEventListener("click", () => go({ name: "mobility", back: { name: "home" } }));
     screen.querySelectorAll("[data-sess]").forEach(b => b.addEventListener("click", () => go({ name: "sessionEdit", key: b.dataset.sess, back: { name: "home" } })));
+    screen.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => { dayPick = b.dataset.day; go({ name: "train" }); }));
   }
 
   function renderHomeZero(day, title) {
@@ -619,6 +625,11 @@
       </div>
 
       <div class="nh-sect">
+        <div class="nh-shead"><span class="l">Workouts</span><span class="r">tap to view</span></div>
+        ${ROTATION.map(dk => `<button class="nh-logrow" data-day="${dk}"><div><div class="lt">${DAY_SHORT[dk]}${dk === day ? " · next" : ""}</div><div class="ls">${(PROGRAM[dk].title.split(" — ")[1] || "").trim()} · ${progFor(dk).exercises.length} moves</div></div><span class="nh-go">›</span></button>`).join("")}
+      </div>
+
+      <div class="nh-sect">
         <div class="nh-shead"><span class="l">Log</span></div>
         <button class="nh-logrow" id="log-move-row"><div><div class="lt">Movement</div><div class="ls">a run, a match, a walk, a yoga flow</div></div><span class="nh-go">＋</span></button>
         <button class="nh-logrow" id="log-mob-row"><div><div class="lt">Mobility flow</div><div class="ls">standing videos · no floor</div></div><span class="nh-go">›</span></button>
@@ -631,6 +642,7 @@
     document.getElementById("bw-tile").addEventListener("click", () => go({ name: "bwEdit", back: { name: "home" } }));
     document.getElementById("log-move-row").addEventListener("click", () => go({ name: "moveEdit", back: { name: "home" } }));
     document.getElementById("log-mob-row").addEventListener("click", () => go({ name: "mobility", back: { name: "home" } }));
+    screen.querySelectorAll("[data-day]").forEach(b => b.addEventListener("click", () => { dayPick = b.dataset.day; go({ name: "train" }); }));
   }
 
   // ---------- TRAIN (session overview) ----------
