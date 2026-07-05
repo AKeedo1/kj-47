@@ -552,6 +552,15 @@
       </div>
 
       <div class="nh-sect">
+        <div class="nh-shead"><span class="l">Recent sessions</span></div>
+        ${(function () {
+          const done = Object.entries(store.sessions || {}).filter(e => isDone(e[1])).sort((a, b) => new Date(b[1].date) - new Date(a[1].date)).slice(0, 6);
+          if (!done.length) return `<p class="nh-showline" style="opacity:.55">Logged workouts appear here — tap one to edit its sets or delete it.</p>`;
+          return done.map(e => { const s = e[1]; const n = Object.values(s.exercises || {}).filter(x => (x.sets || []).some(y => y.done)).length; return `<button class="nh-logrow" data-sess="${e[0]}"><div><div class="lt">${DAY_SHORT[s.day] || s.day}</div><div class="ls">${fmtDate(s.date)} · ${n} exercise${n === 1 ? "" : "s"} · tap to edit or delete</div></div><span class="nh-go">›</span></button>`; }).join("");
+        })()}
+      </div>
+
+      <div class="nh-sect">
         <div class="nh-shead" style="align-items:center"><span class="l">The numbers</span><div class="nh-seg"><button class="on" data-seg="points">Points</button><button data-seg="raw">Stats</button></div></div>
         <div class="nh-lgblock" id="lgblock">
           <div class="nh-lgrow"><div><div class="nh-ln">Strength</div><div class="nh-lsub">sets + PRs · last 8 wks</div></div><div><span class="lp"><div class="nh-lv">${d.strengthPoints}</div><div class="nh-ld">pts</div></span><span class="lr"><div class="nh-lv">${fmtVol(d.totalVol)}</div><div class="nh-ld">kg lifted</div></span></div></div>
@@ -572,6 +581,7 @@
     const bwt = document.getElementById("bw-tile"); if (bwt) bwt.addEventListener("click", () => go({ name: "bwEdit", back: { name: "home" } }));
     const lmr = document.getElementById("log-move-row"); if (lmr) lmr.addEventListener("click", () => go({ name: "moveEdit", back: { name: "home" } }));
     const lmb = document.getElementById("log-mob-row"); if (lmb) lmb.addEventListener("click", () => go({ name: "mobility", back: { name: "home" } }));
+    screen.querySelectorAll("[data-sess]").forEach(b => b.addEventListener("click", () => go({ name: "sessionEdit", key: b.dataset.sess, back: { name: "home" } })));
   }
 
   function renderHomeZero(day, title) {
@@ -679,11 +689,10 @@
           const lastStr = last ? "Last: " + last.map(x => `${fmtN(x.weight)}×${x.reps}`).join(", ") : "First time";
           const flagged = session.feel === "joints" && session.joint && (JOINT_LOAD[session.joint] || []).includes(exId);
           const scheme = st.completed ? '<span class="excard__check">done</span>' : schemeLine(ex, st);
-          const _pi = ssPartnerIdx(prog.exercises, i);
-          const _pn = _pi !== -1 ? (EXERCISE_LIBRARY[effId(session, _pi, prog.exercises[_pi])] || {}).name : "";
-          return `<button class="excard ${st.completed ? "is-done" : ""}" data-ex="${i}">
+          const _groupStart = i === 0 || (prog.exercises[i - 1] || {}).ss !== ex.ss;
+          const _header = _groupStart && ex.ss ? `<p style="margin:20px 2px 7px;font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;opacity:.5">${ex.ss === "C" ? "Finisher" : "Superset " + ex.ss} — do the two together, rest after both</p>` : "";
+          return _header + `<button class="excard ${st.completed ? "is-done" : ""}" data-ex="${i}">
             <div class="excard__top"><span class="excard__name">${lib.name}${exId !== ex.id ? ' <span class="sw">swap</span>' : ""}</span><span class="excard__scheme">${scheme}</span></div>
-            ${_pn ? `<div class="excard__last" style="opacity:.6">Superset — pair with ${_pn}, rest once after both</div>` : ""}
             <div class="excard__last">${lastStr}</div>
             ${!st.completed && st.reason ? `<div class="coach">${st.reason}</div>` : ""}
             ${flagged ? `<div class="excard__last accent">Ease off or swap — ${session.joint.toLowerCase()} flagged today</div>` : ""}
@@ -999,14 +1008,16 @@
     const total = prog.exercises.length;
     const _gpi = ssPartnerIdx(prog.exercises, guided.exIdx);
     const _gpn = _gpi !== -1 ? (EXERCISE_LIBRARY[effId(session, _gpi, prog.exercises[_gpi])] || {}).name : "";
-    const ssNote = _gpn ? `<p class="gcue" style="opacity:.7">Superset with ${_gpn} — alternate the two and rest once after both, for a faster session.</p>` : "";
-    const frac = (guided.exIdx + guided.setIdx / Math.max(1, ex.sets)) / total;
+    const ssNote = _gpn ? `<p class="gcue" style="opacity:.7">Paired with ${_gpn} — the app alternates you two; one rest after both.</p>` : "";
+    let _totSets = 0, _doneSets = 0;
+    prog.exercises.forEach((e, idx) => { const id = effId(session, idx, e); const s = session.exercises[id]; _totSets += e.sets; if (s && s.sets) _doneSets += s.sets.filter(x => x.done).length; });
+    const frac = _totSets ? _doneSets / _totSets : 0;
     const repLabel = ex.id === "bike_finisher" ? ex.reps : (/each side|paces/i.test(ex.reps) ? ex.reps : (st.rxReps || ex.reps) + " reps");
 
     screen.innerHTML = `
       <div class="guided">
         <div class="gbar"><button class="gbar__x" id="g-exit">Exit</button><span class="gbar__track"><span class="gbar__fill" style="width:${(frac * 100).toFixed(0)}%"></span></span></div>
-        <p class="gstep">Exercise ${guided.exIdx + 1} of ${total}</p>
+        <p class="gstep">${_gpi !== -1 ? (ex.ss === "C" ? "Finisher" : "Superset " + ex.ss) + " · round " + (guided.setIdx + 1) + " of " + ex.sets : "Exercise " + (guided.exIdx + 1) + " of " + total}</p>
         <h1 class="gname">${lib.name}</h1>
         <p class="gcue">${lib.cue}</p>
         ${ssNote}
@@ -1036,13 +1047,25 @@
       const pr = checkPR(exId, set);
       const ulw = document.getElementById("g-ulw"); ulw.classList.remove("is-on"); void ulw.offsetWidth; ulw.classList.add("is-on");
       buzz(); document.getElementById("g-pr").textContent = prText(pr);
-      const lastSet = guided.setIdx >= ex.sets - 1, lastEx = guided.exIdx >= total - 1;
-      if (lastSet && lastEx) { setTimeout(finishSession, 700); return; }
-      guided.setIdx = lastSet ? 0 : guided.setIdx + 1; if (lastSet) guided.exIdx++;
-      let nextText;
-      if (lastSet) { const ne = prog.exercises[guided.exIdx]; const nl = ne ? EXERCISE_LIBRARY[effId(session, guided.exIdx, ne)] : null; nextText = nl ? "Next: " + nl.name : "Last set"; }
-      else nextText = "Next: set " + (guided.setIdx + 1);
-      const rs = restFor(exId); if (rs > 0) startRest(() => renderGuided(), nextText, rs); else renderGuided();
+      const round = guided.setIdx, partnerIdx = ssPartnerIdx(prog.exercises, guided.exIdx);
+      const nameAt = (idx) => { const e = prog.exercises[idx]; const l = e ? EXERCISE_LIBRARY[effId(session, idx, e)] : null; return l ? l.name : ""; };
+      let nextText = "", rs = restFor(exId);
+      if (partnerIdx === -1) {
+        // solo exercise — finish all its sets, then the next block
+        const lastSet = round >= ex.sets - 1, lastEx = guided.exIdx >= total - 1;
+        if (lastSet && lastEx) { setTimeout(finishSession, 700); return; }
+        guided.setIdx = lastSet ? 0 : round + 1; if (lastSet) guided.exIdx++;
+        nextText = lastSet ? (nameAt(guided.exIdx) ? "Next: " + nameAt(guided.exIdx) : "Last set") : "Next: set " + (guided.setIdx + 1);
+      } else if (partnerIdx > guided.exIdx) {
+        // first of the pair done → straight into the partner, same round, no rest
+        guided.exIdx = partnerIdx; nextText = "Straight into: " + nameAt(partnerIdx); rs = 0;
+      } else {
+        // second of the pair done → full rest, then next round or next block
+        const firstIdx = partnerIdx;
+        if (round + 1 < ex.sets) { guided.exIdx = firstIdx; guided.setIdx = round + 1; nextText = "Round " + (round + 2) + " · " + nameAt(firstIdx); }
+        else { const nextIdx = Math.max(guided.exIdx, firstIdx) + 1; if (nextIdx >= total) { setTimeout(finishSession, 700); return; } guided.exIdx = nextIdx; guided.setIdx = 0; nextText = "Next: " + nameAt(nextIdx); }
+      }
+      if (rs > 0) startRest(() => renderGuided(), nextText, rs); else renderGuided();
     });
     document.getElementById("g-exit").addEventListener("click", () => exitGuided(true));
     document.getElementById("g-skip").addEventListener("click", () => { if (confirm("Skip this exercise?")) { guided.exIdx++; guided.setIdx = 0; renderGuided(); } });
