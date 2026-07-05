@@ -639,7 +639,7 @@
     const { key } = getSession(store, day);
     store.current = key; if (!store.started) store.started = new Date().toISOString(); save(store);
     primeAudio();
-    view = { name: "train", day }; history.pushState({ v: "train" }, ""); render();
+    startGuided();   // straight into the guided flow — which now opens with warm-up + session preview
   }
 
   function currentDay() {
@@ -980,21 +980,65 @@
     const day = currentDay(); const prog = progFor(day); const { session } = getSession(store, day);
     if (!session.startedAt) { session.startedAt = new Date().toISOString(); save(store); }
     primeAudio();
-    // first incomplete exercise / set
-    let exIdx = 0, setIdx = 0;
+    // scan for the first incomplete set + whether anything's been logged yet
+    let exIdx = 0, setIdx = 0, anyDone = false, found = false;
     for (let i = 0; i < prog.exercises.length; i++) {
       const exId = effId(session, i, prog.exercises[i]); ensureSets(session, exId, prog.exercises[i].sets, lastPerformance(store, exId), prog.exercises[i]);
       const st = session.exercises[exId];
+      if (st.sets.some(s => s.done)) anyDone = true;
       const u = st.sets.findIndex(s => !s.done);
-      if (u !== -1) { exIdx = i; setIdx = u; break; }
-      if (i === prog.exercises.length - 1) return finishSession();
+      if (u !== -1 && !found) { exIdx = i; setIdx = u; found = true; }
     }
-    guided = { day, exIdx, setIdx, state: "set" };
+    if (!found) return finishSession();
+    // fresh session opens on the warm-up + preview; resuming jumps straight to the next set
+    guided = { day, exIdx, setIdx, phase: anyDone ? "set" : "warmup", state: "set" };
     go({ name: "guided" });
+  }
+
+  function renderGuidedWarmup() {
+    const { day } = guided; const prog = progFor(day); const { session } = getSession(store, day);
+    const exs = prog.exercises, groups = [];
+    exs.forEach((e, i) => { const nm = (EXERCISE_LIBRARY[effId(session, i, e)] || {}).name || ""; const g = groups.find(x => x.ss === e.ss); if (g) g.names.push(nm); else groups.push({ ss: e.ss, names: [nm] }); });
+    const pairList = groups.map(g => `<div style="display:flex;justify-content:space-between;gap:12px;padding:11px 2px;border-bottom:1px solid rgba(255,255,255,.08)"><span style="opacity:.5;font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap">${g.ss === "C" ? "Finisher" : "Superset " + g.ss}</span><span style="text-align:right">${g.names.join(" + ")}</span></div>`).join("");
+    screen.innerHTML = `
+      <div class="guided">
+        <div class="gbar"><button class="gbar__x" id="gw-exit">Exit</button></div>
+        <p class="kicker">Phase 1 · Week ${programWeek()} of 6</p>
+        <h1 class="gname" style="margin-bottom:4px">${prog.title.split(" — ")[0]}</h1>
+        <p class="gcue" style="opacity:.75">~45 min · ${exs.length} moves in ${groups.length} supersets</p>
+
+        <p class="section__title" style="margin-top:24px">How does it feel?</p>
+        <div class="feel__opts" id="feel-opts">${FEEL_OPTIONS.map(o => `<button class="feel__opt ${session.feel === o.id ? "is-sel" : ""}" data-feel="${o.id}">${o.label}</button>`).join("")}</div>
+        <p class="feel__note">${(FEEL_OPTIONS.find(o => o.id === session.feel) || {}).note || ""}</p>
+        <div class="joints" id="joints" ${session.feel === "joints" ? "" : "hidden"}>${JOINTS.map(j => `<button class="joints__b ${session.joint === j ? "is-sel" : ""}" data-joint="${j}">${j}</button>`).join("")}</div>
+
+        <div class="warm" style="margin-top:22px"><p class="warm__t">Warm-up first</p>${warmupFor(day, session)}</div>
+
+        <p class="section__title" style="margin-top:22px">Your session · set these up</p>
+        <div>${pairList}</div>
+
+        <div class="section" style="margin-top:22px"><p class="section__title">Who's in</p>
+          <div class="crew">${CREW.map(c => `<button class="crew__chip ${session.crew[c] ? "is-in" : ""}" data-crew="${c}">${c}<small>${session.crew[c] ? "In" : "Out"}</small></button>`).join("")}</div>
+        </div>
+
+        <div style="height:100px"></div>
+        <div class="trainbar"><button class="btn btn--solid" id="gw-start">Warm-up done — start lifting</button></div>
+      </div>`;
+    screen.querySelectorAll("[data-feel]").forEach(b => b.addEventListener("click", () => {
+      session.feel = session.feel === b.dataset.feel ? null : b.dataset.feel;
+      if (session.feel !== "joints") session.joint = null;
+      Object.keys(session.exercises).forEach(exId => { const e = session.exercises[exId]; if (!(e.sets || []).some(s => s.done)) delete session.exercises[exId]; });
+      save(store); renderGuidedWarmup();
+    }));
+    screen.querySelectorAll("[data-joint]").forEach(b => b.addEventListener("click", () => { session.joint = session.joint === b.dataset.joint ? null : b.dataset.joint; save(store); renderGuidedWarmup(); }));
+    screen.querySelectorAll("[data-crew]").forEach(b => b.addEventListener("click", () => { session.crew[b.dataset.crew] = !session.crew[b.dataset.crew]; save(store); renderGuidedWarmup(); }));
+    document.getElementById("gw-start").addEventListener("click", () => { guided.phase = "set"; guided.exIdx = 0; guided.setIdx = 0; renderGuided(); });
+    document.getElementById("gw-exit").addEventListener("click", () => exitGuided(true));
   }
 
   function renderGuided() {
     if (!guided) { view = { name: "train" }; renderTrain(); return; }
+    if (guided.phase === "warmup") return renderGuidedWarmup();
     const { day } = guided; const prog = progFor(day); const { session } = getSession(store, day);
     if (guided.exIdx >= prog.exercises.length) return finishSession();
     const ex = prog.exercises[guided.exIdx]; const exId = effId(session, guided.exIdx, ex); const lib = EXERCISE_LIBRARY[exId];
@@ -1049,7 +1093,7 @@
       buzz(); document.getElementById("g-pr").textContent = prText(pr);
       const round = guided.setIdx, partnerIdx = ssPartnerIdx(prog.exercises, guided.exIdx);
       const nameAt = (idx) => { const e = prog.exercises[idx]; const l = e ? EXERCISE_LIBRARY[effId(session, idx, e)] : null; return l ? l.name : ""; };
-      let nextText = "", rs = restFor(exId);
+      let nextText = "", rs = restFor(exId), restLbl = "Rest";
       if (partnerIdx === -1) {
         // solo exercise — finish all its sets, then the next block
         const lastSet = round >= ex.sets - 1, lastEx = guided.exIdx >= total - 1;
@@ -1057,15 +1101,15 @@
         guided.setIdx = lastSet ? 0 : round + 1; if (lastSet) guided.exIdx++;
         nextText = lastSet ? (nameAt(guided.exIdx) ? "Next: " + nameAt(guided.exIdx) : "Last set") : "Next: set " + (guided.setIdx + 1);
       } else if (partnerIdx > guided.exIdx) {
-        // first of the pair done → straight into the partner, same round, no rest
-        guided.exIdx = partnerIdx; nextText = "Straight into: " + nameAt(partnerIdx); rs = 0;
+        // first of the pair done → short "switch stations" pause (display + countdown + skip), then the partner (same round)
+        guided.exIdx = partnerIdx; nextText = "Superset · switch to " + nameAt(partnerIdx); rs = 20; restLbl = "Switch";
       } else {
         // second of the pair done → full rest, then next round or next block
         const firstIdx = partnerIdx;
         if (round + 1 < ex.sets) { guided.exIdx = firstIdx; guided.setIdx = round + 1; nextText = "Round " + (round + 2) + " · " + nameAt(firstIdx); }
         else { const nextIdx = Math.max(guided.exIdx, firstIdx) + 1; if (nextIdx >= total) { setTimeout(finishSession, 700); return; } guided.exIdx = nextIdx; guided.setIdx = 0; nextText = "Next: " + nameAt(nextIdx); }
       }
-      if (rs > 0) startRest(() => renderGuided(), nextText, rs); else renderGuided();
+      if (rs > 0) startRest(() => renderGuided(), nextText, rs, restLbl); else renderGuided();
     });
     document.getElementById("g-exit").addEventListener("click", () => exitGuided(true));
     document.getElementById("g-skip").addEventListener("click", () => { if (confirm("Skip this exercise?")) { guided.exIdx++; guided.setIdx = 0; renderGuided(); } });
@@ -1248,10 +1292,11 @@
 
   // ---------- rest timer (Date.now anchored, survives backgrounding) ----------
   let restInt = null, restEnd = 0, restRemain = REST_SECONDS, restCb = null;
-  const restEl = document.getElementById("rest"), restTime = document.getElementById("rest-time"), restNext = document.getElementById("rest-next");
-  function startRest(cb, nextText, seconds) {
+  const restEl = document.getElementById("rest"), restTime = document.getElementById("rest-time"), restNext = document.getElementById("rest-next"), restLabel = document.getElementById("rest-label");
+  function startRest(cb, nextText, seconds, label) {
     const s = (seconds != null ? seconds : REST_SECONDS);
     restCb = cb || null; restRemain = s; restEnd = Date.now() + s * 1000;
+    if (restLabel) restLabel.textContent = label || "Rest";
     restNext.textContent = nextText || ""; restEl.hidden = false; paintRest();
     if (restInt) clearInterval(restInt);
     restInt = setInterval(() => { restRemain = Math.ceil((restEnd - Date.now()) / 1000); if (restRemain <= 0) { doneRest(); } else paintRest(); }, 250);
