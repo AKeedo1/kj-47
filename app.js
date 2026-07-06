@@ -1007,6 +1007,31 @@
     go({ name: "guided" });
   }
 
+  function renderGuidedPick() {
+    const { day } = guided; const prog = progFor(day); const { session } = getSession(store, day);
+    const rows = prog.exercises.map((e, i) => {
+      const exId = effId(session, i, e); const lib = EXERCISE_LIBRARY[exId] || {};
+      const st = session.exercises[exId]; const doneCount = st ? st.sets.filter(s => s.done).length : 0;
+      const complete = doneCount >= e.sets, ssName = e.ss === "C" ? "Finisher" : "Superset " + e.ss, cur = i === guided.exIdx;
+      return `<button class="nh-logrow" data-jump="${i}"${complete ? ' disabled style="opacity:.4"' : ""}><div><div class="lt">${lib.name}${cur ? " · current" : ""}</div><div class="ls">${ssName} · ${complete ? "done" : doneCount + " of " + e.sets + " sets"}</div></div><span class="nh-go">${complete ? "" : "›"}</span></button>`;
+    }).join("");
+    screen.innerHTML = `
+      <div class="guided">
+        <div class="gbar"><button class="gbar__x" id="gp-back">Back</button></div>
+        <h1 class="gname" style="margin-bottom:4px">Do any exercise</h1>
+        <p class="gcue" style="opacity:.75">Machine busy? Pick whatever's free — order doesn't matter, it all still counts.</p>
+        <div style="margin-top:18px">${rows}</div>
+        <div style="height:40px"></div>
+      </div>`;
+    screen.querySelectorAll("[data-jump]").forEach(b => b.addEventListener("click", () => {
+      const i = +b.dataset.jump, e = prog.exercises[i], exId = effId(session, i, e);
+      ensureSets(session, exId, e.sets, lastPerformance(store, exId), e);
+      const st = session.exercises[exId]; let u = st.sets.findIndex(s => !s.done); if (u === -1) u = 0;
+      guided.exIdx = i; guided.setIdx = u; guided.phase = "set"; renderGuided();
+    }));
+    document.getElementById("gp-back").addEventListener("click", () => renderGuided());
+  }
+
   function renderGuidedWarmup() {
     const { day } = guided; const prog = progFor(day); const { session } = getSession(store, day);
     const exs = prog.exercises, groups = [];
@@ -1089,7 +1114,7 @@
           <p class="gprtext" id="g-pr"></p>
           ${!feeler ? `<div class="grpe" id="g-rpe"><button class="grpe__b ${set.rpe === "easy" ? "is-sel" : ""}" data-rpe="easy">Had more</button><button class="grpe__b ${set.rpe === "ontarget" ? "is-sel" : ""}" data-rpe="ontarget">On it</button><button class="grpe__b ${set.rpe === "grind" ? "is-sel" : ""}" data-rpe="grind">Grinding</button></div>` : ""}
           <button class="btn btn--solid glog" id="g-log">Log set</button>
-          <div class="gquick"><button class="gquick__b" id="g-demo-btn">Watch how</button><button class="gquick__b" id="g-skip">Skip exercise</button><button class="gquick__b" id="g-swap">Swap</button></div>
+          <div class="gquick"><button class="gquick__b" id="g-demo-btn">Watch how</button><button class="gquick__b" id="g-jump">Do another</button><button class="gquick__b" id="g-skip">Skip</button><button class="gquick__b" id="g-swap">Swap</button></div>
         </div>
       </div>`;
 
@@ -1126,6 +1151,7 @@
     document.getElementById("g-exit").addEventListener("click", () => exitGuided(true));
     document.getElementById("g-skip").addEventListener("click", () => { if (confirm("Skip this exercise?")) { guided.exIdx++; guided.setIdx = 0; renderGuided(); } });
     document.getElementById("g-swap").addEventListener("click", () => { const i = guided.exIdx; exitGuided(false); go({ name: "exercise", idx: i }); });
+    document.getElementById("g-jump").addEventListener("click", () => renderGuidedPick());
     screen.querySelectorAll("#g-rpe .grpe__b").forEach(b => b.addEventListener("click", () => { set.rpe = set.rpe === b.dataset.rpe ? null : b.dataset.rpe; save(store); document.querySelectorAll("#g-rpe .grpe__b").forEach(x => x.classList.toggle("is-sel", x.dataset.rpe === set.rpe)); }));
     document.getElementById("g-demo-btn").addEventListener("click", () => {
       const gd = document.getElementById("g-demo");
