@@ -936,20 +936,24 @@
       const row = document.createElement("div");
       row.className = "setrow" + (set.done ? " is-done" : "");
       row.innerHTML = `
-        <span class="setrow__n">Set ${i + 1}</span>
-        <span class="stepper">
-          <button class="stepper__b" data-w="-2.5">&minus;</button>
-          <span class="ul-fx" data-ulw><input class="stepper__f" inputmode="decimal" value="${set.weight}" data-f="weight"></span>
-          <span class="stepper__u">kg</span>
-          <button class="stepper__b" data-w="2.5">+</button>
-        </span>
-        <span class="stepper">
-          <button class="stepper__b" data-r="-1">&minus;</button>
-          <input class="stepper__f" inputmode="numeric" value="${set.reps}" data-f="reps">
-          <span class="stepper__u">rep</span>
-          <button class="stepper__b" data-r="1">+</button>
-        </span>
-        <button class="setrow__log">${set.done ? "Done" : "Log"}</button>`;
+        <div class="setrow__top">
+          <span class="setrow__n">Set ${i + 1}</span>
+          <button class="setrow__log">${set.done ? "Done" : "Log"}</button>
+        </div>
+        <div class="setrow__ctrls">
+          <span class="stepper">
+            <button class="stepper__b" data-w="-2.5">&minus;</button>
+            <span class="ul-fx" data-ulw><input class="stepper__f" inputmode="decimal" value="${set.weight}" data-f="weight"></span>
+            <span class="stepper__u">kg</span>
+            <button class="stepper__b" data-w="2.5">+</button>
+          </span>
+          <span class="stepper">
+            <button class="stepper__b" data-r="-1">&minus;</button>
+            <input class="stepper__f" inputmode="numeric" value="${set.reps}" data-f="reps">
+            <span class="stepper__u">rep</span>
+            <button class="stepper__b" data-r="1">+</button>
+          </span>
+        </div>`;
       const wIn = row.querySelector('[data-f="weight"]'), rIn = row.querySelector('[data-f="reps"]');
       row.querySelectorAll("[data-w]").forEach(b => b.addEventListener("click", () => { wIn.value = Math.max(0, (parseFloat(wIn.value) || 0) + parseFloat(b.dataset.w)); set.weight = wIn.value; persist(day); }));
       row.querySelectorAll("[data-r]").forEach(b => b.addEventListener("click", () => { rIn.value = Math.max(0, (parseInt(rIn.value, 10) || 0) + parseInt(b.dataset.r, 10)); set.reps = String(rIn.value); persist(day); }));

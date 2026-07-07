@@ -275,15 +275,18 @@ input{font-family:inherit}
 
 /* set logger */
 .logger{margin-top:22px}
-.setrow{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line-soft)}
+html,body{-webkit-text-size-adjust:100%;touch-action:manipulation}
+.setrow{display:flex;flex-direction:column;gap:12px;padding:14px 0;border-top:1px solid var(--line-soft)}
 .setrow.is-done{opacity:.55}
-.setrow__n{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);width:42px;flex:none}
-.stepper{flex:1;display:flex;align-items:center;justify-content:center;gap:6px}
-.stepper__b{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);font-size:20px;color:var(--fg);display:grid;place-items:center;flex:none}
-.stepper__f{width:64px;text-align:center;background:transparent;border:none;color:var(--fg);font-family:var(--display);font-weight:300;font-size:24px;-moz-appearance:textfield}
+.setrow__top{display:flex;align-items:center;justify-content:space-between}
+.setrow__n{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.setrow__ctrls{display:flex;gap:10px}
+.stepper{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px}
+.stepper__b{width:36px;height:38px;border-radius:50%;border:1px solid var(--line);font-size:20px;color:var(--fg);display:grid;place-items:center;flex:none}
+.stepper__f{width:100%;min-width:0;text-align:center;background:transparent;border:none;color:var(--fg);font-family:var(--display);font-weight:300;font-size:22px;-moz-appearance:textfield}
 .stepper__f::-webkit-outer-spin-button,.stepper__f::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.stepper__u{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);width:26px;flex:none}
-.setrow__log{flex:none;width:52px;height:40px;border-radius:12px;background:var(--fg);color:var(--bg);font-family:var(--display);font-size:13px}
+.stepper__u{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);flex:none}
+.setrow__log{flex:none;width:76px;height:38px;border-radius:12px;background:var(--fg);color:var(--bg);font-family:var(--display);font-size:14px}
 .setrow.is-done .setrow__log{background:transparent;border:1px solid var(--acc);color:var(--acc)}
 .setrow__log.is-off{background:transparent;border:1px solid var(--line);color:var(--mut)}
 .edit__ex{font-family:var(--display);font-weight:300;font-size:21px;margin-bottom:10px}
