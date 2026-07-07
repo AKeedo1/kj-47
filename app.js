@@ -58,18 +58,21 @@
   ];
   const JOINTS = ["Back", "Knee", "Ankle", "Shoulder"];
   const JOINT_LOAD = {
-    Knee: ["goblet_squat", "leg_press", "wall_sit"],
-    Back: ["db_rdl", "good_morning"],
-    Ankle: ["calf_raise", "seated_calf_raise", "goblet_squat", "wall_sit"],
-    Shoulder: ["db_shoulder_press", "machine_shoulder_press", "lateral_raise", "incline_db_press", "db_bench_press", "overhead_tricep_extension"]
+    Knee: ["goblet_squat", "leg_press", "hack_squat", "leg_extension", "wall_sit"],
+    Back: ["db_rdl", "good_morning", "back_extension", "hip_thrust", "barbell_row", "t_bar_row", "one_arm_db_row", "cable_crunch", "hanging_leg_raise"],
+    Ankle: ["calf_raise", "seated_calf_raise", "goblet_squat", "hack_squat", "wall_sit"],
+    Shoulder: ["db_shoulder_press", "machine_shoulder_press", "arnold_press", "lateral_raise", "cable_lateral_raise", "incline_db_press", "db_bench_press", "barbell_bench_press", "machine_chest_press", "pec_deck", "pushup", "overhead_tricep_extension", "skullcrusher", "face_pull", "pullup", "chinup"]
   };
   // Marcus's progression engine — load increments (kg total) per movement
   const STEP = {
-    leg_press: 5, machine_chest_press: 5, machine_row: 5, lat_pulldown: 5, seated_cable_row: 5,
-    machine_shoulder_press: 5, tricep_pushdown: 5, cable_curl: 5, pallof_press: 5, assisted_pullup: 5,
-    goblet_squat: 2.5, db_bench_press: 2.5, incline_db_press: 2.5, db_shoulder_press: 2.5, db_rdl: 2.5,
-    good_morning: 2.5, suitcase_carry: 2.5, bicep_curl: 2.5, hammer_curl: 2.5, lateral_raise: 2.5,
-    overhead_tricep_extension: 2.5, calf_raise: 2.5, seated_calf_raise: 2.5, wall_sit: 0, bike_finisher: 0
+    leg_press: 5, hack_squat: 5, leg_extension: 5, seated_leg_curl: 5, hip_thrust: 5,
+    machine_chest_press: 5, pec_deck: 5, machine_row: 5, barbell_row: 5, t_bar_row: 5,
+    lat_pulldown: 5, neutral_grip_pulldown: 5, seated_cable_row: 5, face_pull: 5,
+    machine_shoulder_press: 5, tricep_pushdown: 5, cable_curl: 5, cable_lateral_raise: 5, pallof_press: 5, cable_crunch: 5, assisted_pullup: 5,
+    goblet_squat: 2.5, db_bench_press: 2.5, incline_db_press: 2.5, barbell_bench_press: 2.5, db_shoulder_press: 2.5, arnold_press: 2.5, db_rdl: 2.5,
+    good_morning: 2.5, back_extension: 2.5, one_arm_db_row: 2.5, suitcase_carry: 2.5, bicep_curl: 2.5, hammer_curl: 2.5, preacher_curl: 2.5, lateral_raise: 2.5,
+    overhead_tricep_extension: 2.5, skullcrusher: 2.5, calf_raise: 2.5, seated_calf_raise: 2.5,
+    pushup: 0, pullup: 0, chinup: 0, hanging_leg_raise: 0, wall_sit: 0, bike_finisher: 0
   };
   // Reason lines — Marcus's voice, shown with each prescription
   const REASONS = {
@@ -899,7 +902,7 @@
       ${st.reason ? `<p class="coach">${st.reason}</p>` : ""}
       ${flaggedJoint ? (jointAlt ? `<div class="jointswap"><p class="coach" style="margin-top:0">Your ${flaggedJoint.toLowerCase()} is flagged. ${EXERCISE_LIBRARY[jointAlt].name} spares it today.</p><button class="btn btn--outline" id="joint-swap">Swap to ${EXERCISE_LIBRARY[jointAlt].name}</button></div>` : `<div class="jointswap"><p class="coach" style="margin-top:0">Your ${flaggedJoint.toLowerCase()} is flagged, and nothing here truly spares it. Light feeler only, stop if it bites — or skip it today.</p><button class="btn btn--outline" id="joint-skip">Skip today</button></div>`) : ""}
 
-      <div class="demo" id="demo" data-vid="${lib.video}">
+      <div class="demo" id="demo" data-vid="${lib.video}" data-name="${lib.name}">
         <img class="demo__poster" src="https://i.ytimg.com/vi/${lib.video}/hqdefault.jpg" alt="" onerror="this.style.display='none'">
         <div class="demo__play"><span class="demo__playlabel">Watch the form</span></div>
       </div>
@@ -1155,7 +1158,7 @@
     screen.querySelectorAll("#g-rpe .grpe__b").forEach(b => b.addEventListener("click", () => { set.rpe = set.rpe === b.dataset.rpe ? null : b.dataset.rpe; save(store); document.querySelectorAll("#g-rpe .grpe__b").forEach(x => x.classList.toggle("is-sel", x.dataset.rpe === set.rpe)); }));
     document.getElementById("g-demo-btn").addEventListener("click", () => {
       const gd = document.getElementById("g-demo");
-      if (gd.hidden) { gd.innerHTML = `<div class="demo" style="margin-top:12px"><iframe src="https://www.youtube.com/embed/${lib.video}?rel=0&modestbranding=1&playsinline=1" allow="encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`; gd.hidden = false; }
+      if (gd.hidden) { gd.innerHTML = lib.video ? `<div class="demo" style="margin-top:12px"><iframe src="https://www.youtube.com/embed/${lib.video}?rel=0&modestbranding=1&playsinline=1" allow="encrypted-media; picture-in-picture" allowfullscreen></iframe></div>` : `<a class="btn btn--ghost" href="https://www.youtube.com/results?search_query=${encodeURIComponent(lib.name + " exercise form")}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:12px">Search YouTube for "${lib.name}"</a>`; gd.hidden = false; }
       else { gd.innerHTML = ""; gd.hidden = true; }
     });
   }
@@ -1323,6 +1326,7 @@
     if (!box) return;
     box.addEventListener("click", function once() {
       const id = box.dataset.vid;
+      if (!id) { window.open("https://www.youtube.com/results?search_query=" + encodeURIComponent((box.dataset.name || "") + " exercise form"), "_blank", "noopener"); return; }
       box.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
       box.removeEventListener("click", once);
     });
