@@ -1035,6 +1035,18 @@
     document.getElementById("gp-back").addEventListener("click", () => renderGuided());
   }
 
+  function switchGuidedDay(newDay) {
+    if (!guided || newDay === guided.day) return;
+    const oldKey = dateKey(guided.day), oldSess = store.sessions[oldKey];
+    if (oldSess && !isDone(oldSess)) delete store.sessions[oldKey];  // drop the empty session so it doesn't orphan
+    dayPick = newDay;
+    const { key } = getSession(store, newDay);
+    store.current = key;
+    guided.day = newDay; guided.exIdx = 0; guided.setIdx = 0; guided.phase = "warmup";
+    save(store);
+    renderGuidedWarmup();
+  }
+
   function renderGuidedWarmup() {
     const { day } = guided; const prog = progFor(day); const { session } = getSession(store, day);
     const exs = prog.exercises, groups = [];
@@ -1046,6 +1058,7 @@
         <p class="kicker">Phase 1 · Week ${programWeek()} of 6</p>
         <h1 class="gname" style="margin-bottom:4px">${prog.title.split(" — ")[0]}</h1>
         <p class="gcue" style="opacity:.75">~45 min · ${exs.length} moves in ${groups.length} supersets</p>
+        <div class="feel__opts" style="margin-top:14px">${ROTATION.map(dk => `<button class="feel__opt ${dk === guided.day ? "is-sel" : ""}" data-swday="${dk}">${DAY_SHORT[dk]}</button>`).join("")}</div>
 
         <p class="section__title" style="margin-top:24px">How does it feel?</p>
         <div class="feel__opts" id="feel-opts">${FEEL_OPTIONS.map(o => `<button class="feel__opt ${session.feel === o.id ? "is-sel" : ""}" data-feel="${o.id}">${o.label}</button>`).join("")}</div>
@@ -1072,6 +1085,7 @@
     }));
     screen.querySelectorAll("[data-joint]").forEach(b => b.addEventListener("click", () => { session.joint = session.joint === b.dataset.joint ? null : b.dataset.joint; save(store); renderGuidedWarmup(); }));
     screen.querySelectorAll("[data-crew]").forEach(b => b.addEventListener("click", () => { session.crew[b.dataset.crew] = !session.crew[b.dataset.crew]; save(store); renderGuidedWarmup(); }));
+    screen.querySelectorAll("[data-swday]").forEach(b => b.addEventListener("click", () => switchGuidedDay(b.dataset.swday)));
     document.getElementById("gw-start").addEventListener("click", () => { guided.phase = "set"; guided.exIdx = 0; guided.setIdx = 0; renderGuided(); });
     document.getElementById("gw-exit").addEventListener("click", () => exitGuided(true));
   }
