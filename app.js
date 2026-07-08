@@ -91,8 +91,18 @@
   // ---------- store ----------
   const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0, bwGoal: null, movement: [] });
   function load() {
-    try { const r = localStorage.getItem(KEY); const s = r ? JSON.parse(r) : blank(); s.sessions = s.sessions || {}; return s; }
-    catch (e) { return blank(); }
+    try {
+      const r = localStorage.getItem(KEY); const s = r ? JSON.parse(r) : blank(); s.sessions = s.sessions || {};
+      // prune empty "preview" sessions (never logged, not completed, not the active one) so they don't accumulate
+      let pruned = false;
+      for (const k in s.sessions) {
+        const ss = s.sessions[k];
+        const hasDone = Object.values(ss.exercises || {}).some(e => (e.sets || []).some(x => x.done));
+        if (!hasDone && !ss.completedAt && k !== s.current) { delete s.sessions[k]; pruned = true; }
+      }
+      if (pruned) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+      return s;
+    } catch (e) { return blank(); }
   }
   function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
 
@@ -104,7 +114,7 @@
     const k = dateKey(day);
     if (!s.sessions[k]) {
       s.sessions[k] = { day, date: new Date().toISOString(), week: programWeek(), feel: null, joint: null, crew: { Faisal: false, Yazan: false }, swaps: {}, exercises: {}, completedAt: null };
-      save(s);
+      // NOT saved here — a mere preview shouldn't persist a session; it's saved once a set is actually logged (persist/startSession)
     }
     return { key: k, session: s.sessions[k] };
   }
