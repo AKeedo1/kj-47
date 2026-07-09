@@ -1,5 +1,5 @@
 // Cairn — service worker. Offline-first for the app shell.
-const CACHE = "cairn-v2-044";
+const CACHE = "cairn-v2-047";
 const ASSETS = [
   "./",
   "./index.html",
@@ -43,12 +43,20 @@ self.addEventListener("fetch", (e) => {
   }
   // Non-same-origin (YouTube etc.) — straight to network.
   if (url.origin !== self.location.origin) return;
-  // Same-origin: NETWORK-FIRST so updates land immediately when online; fall back to cache offline.
-  e.respondWith(
-    fetch(e.request).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+  // Same-origin: network-first, RACED against a 2.5s timeout so a hanging gym Wi-Fi falls
+  // back to cache fast (2.1). Only cache OK responses; the HTML fallback is navigations only.
+  e.respondWith((async () => {
+    const cached = await caches.match(e.request);
+    const net = fetch(e.request).then((res) => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {}); }
       return res;
-    }).catch(() => caches.match(e.request).then((hit) => hit || caches.match("./index.html")))
-  );
+    });
+    const timeout = new Promise((res) => setTimeout(() => res("__timeout__"), 2500));
+    const winner = await Promise.race([net.catch(() => "__neterr__"), timeout]);
+    if (winner && winner !== "__timeout__" && winner !== "__neterr__" && winner.ok) return winner;
+    if (cached) return cached;
+    try { const res = await net; if (res) return res; } catch (e2) {}
+    if (e.request.mode === "navigate") return (await caches.match("./index.html")) || Response.error();
+    return Response.error();
+  })());
 });

@@ -30,11 +30,12 @@
   </nav>
 
   <!-- Rest timer overlay (shared) -->
-  <div id="rest" class="rest" hidden>
+  <div id="rest" class="rest" role="dialog" aria-modal="true" aria-label="Rest timer" hidden>
     <div class="rest__panel">
       <p class="rest__label" id="rest-label">Rest</p>
       <p class="rest__time" id="rest-time">2:00</p>
       <p class="rest__next" id="rest-next"></p>
+      <p class="rest__pr" id="rest-pr" aria-live="polite"></p>
       <div class="rest__actions">
         <button class="rest__btn" data-rest="-15">&minus;15</button>
         <button class="rest__btn rest__btn--skip" id="rest-skip">Skip</button>

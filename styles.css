@@ -423,3 +423,43 @@ input{font-family:inherit}
 [hidden]{display:none !important}
 .gname,.exhead__name,.finish__h,.shead__day,.rank__tier,.nh-big,.zero__line{overflow-wrap:break-word}
 img,svg,iframe{max-width:100%}
+
+/* ============ Batch 4 — Gym UX ============ */
+/* 4.2 — the PR line inside the rest overlay (same quiet amber treatment as elsewhere) */
+.rest__pr{min-height:14px;margin-top:8px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);text-align:center}
+.rest__pr:empty{margin-top:0}
+
+/* 4.3 — tap targets to >=44px (keep visual weight; grow the hit area) */
+.stepper__b{min-width:44px;min-height:44px}
+.setrow__log{min-height:44px}
+.gquick__b{min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 12px}
+.back{min-height:44px;display:inline-flex;align-items:center}
+.nh-seg button{min-height:40px;padding:0 14px}
+
+/* 4.9 — in guided mode the tab bar is hidden, so the Start bar shouldn't offset for it */
+.guided .trainbar{bottom:0;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+
+/* 4.10 — per-exercise setup notes: one muted, hairline-separated italic line */
+.setupnote{width:100%;margin:12px 0 4px;padding:8px 0;border:0;border-top:1px solid var(--line,rgba(0,0,0,.12));border-bottom:1px solid var(--line,rgba(0,0,0,.12));background:transparent;font-style:italic;font-size:14px;color:var(--mut,#8f8c84);font-family:inherit}
+.setupnote::placeholder{font-style:italic;color:var(--soft,#c9c6bf)}
+.setupnote:focus{outline:none;border-color:var(--acc)}
+.excard__setup{margin-top:4px;font-style:italic;font-size:12.5px;color:var(--mut,#8f8c84)}
+.gsetup{margin:2px 0 6px;font-style:italic;font-size:13px;opacity:.7}
+
+/* ============ Batch 5 — a11y, contrast, motion ============ */
+/* focus-visible (Cairn had zero focus styles) */
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+/* rest overlay is a modal dialog */
+.rest[role="dialog"]{}
+/* contrast — replace opacity-dimmed small text with solid muted tokens */
+.nh-showline{opacity:1;color:var(--mut,#8f8c84)}
+.gcue{opacity:1;color:rgba(255,255,255,.82)}
+.guided .gcue{color:rgba(255,255,255,.82)}
+/* one size for the two "3 dots this week" glyph systems */
+.nh-dots i{width:11px;height:11px}
+/* reduced motion — Cairn animates fade/meter/underline; honour the OS setting */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
+  .screen.fade{animation:none}
+  .meter__fill{transition:none}
+}
