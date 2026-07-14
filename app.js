@@ -53,8 +53,8 @@
     { name: "Morning wake-up", minutes: 10, video: "aRVFt79LqCM", videoTitle: "10 Min Morning Mobility · Full Body, No Equipment — Julia Reppel" }
   ];
   const TIERS = [
-    { n: "Bronze", min: 0 }, { n: "Iron", min: 300 }, { n: "Steel", min: 800 },
-    { n: "Onyx", min: 1600 }, { n: "Slate", min: 2800 }, { n: "Crimson", min: 4400 }, { n: "Apex", min: 6500 }
+    { n: "Bronze", min: 0 }, { n: "Iron", min: 400 }, { n: "Steel", min: 1000 },
+    { n: "Onyx", min: 2000 }, { n: "Slate", min: 3200 }, { n: "Crimson", min: 4800 }, { n: "Apex", min: 6800 }
   ];
   const JOINTS = ["Back", "Knee", "Ankle", "Shoulder"];
   const JOINT_LOAD = {
@@ -91,11 +91,12 @@
   };
 
   // ---------- store ----------
-  const blank = () => ({ schema: 2, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0, bwGoal: null, movement: [], summitShown: false });
+  const blank = () => ({ schema: 3, started: null, onboarded: false, sessions: {}, current: null, bodyweight: [], bestRankIdx: 0, bwGoal: null, movement: [], summitShown: false });
   function load() {
     try {
       const r = localStorage.getItem(KEY); const s = r ? JSON.parse(r) : blank(); s.sessions = s.sessions || {};
-      if ((s.schema || 1) < CURRENT_SCHEMA) migrate(s);   // 2.5 — read the schema, upgrade old stores
+      const migrated = (s.schema || 1) < CURRENT_SCHEMA;
+      if (migrated) migrate(s);   // 2.5 — read the schema, upgrade old stores
       // prune empty "preview" sessions (never logged, not completed, not the active one) so they don't accumulate
       let pruned = false;
       for (const k in s.sessions) {
@@ -103,16 +104,20 @@
         const hasDone = Object.values(ss.exercises || {}).some(e => (e.sets || []).some(x => x.done));
         if (!hasDone && !ss.completedAt && k !== s.current) { delete s.sessions[k]; pruned = true; }
       }
-      if (pruned) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+      if (pruned || migrated) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
       return s;
     } catch (e) { return blank(); }
   }
   function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { flagStorageFail(); } }
 
   // ---------- schema / storage / escaping / backup helpers (Batch 2) ----------
-  const CURRENT_SCHEMA = 2;
+  const CURRENT_SCHEMA = 3;
   function migrate(s) {
-    // 2.5 — versioned upgrades go here; for now just stamp current so old stores read clean
+    // 3 — rank-curve rebalance (2026-07-14): the old scoring inflated the peak (warm-up ramps counted as PRs, 150/kg).
+    // Re-sync bestRankIdx to the honest current tier under the new curve. One-time; the ratchet-up peak resumes after.
+    if ((s.schema || 1) < 3) {
+      try { s.bestRankIdx = derive(s).tierIdx; } catch (e) {}
+    }
     s.schema = CURRENT_SCHEMA;
     return s;
   }
@@ -194,7 +199,7 @@
   const isDone = (sess) => doneSets(sess).length > 0;
 
   const SCORE_WINDOW_DAYS = 56;   // rank counts your last ~8 weeks of training; older sessions age out (current form)
-  const BW_RATE = 150;            // score points per kg lost from baseline weigh-in
+  const BW_RATE = 100;            // score points per kg lost from baseline weigh-in
   const MOVE_RATE = 2, MOVE_CAP = 120;   // movement: 2 pts/min, capped per session
   function derive(s) {
     const all = Object.values(s.sessions || {}).filter(isDone)
@@ -205,6 +210,7 @@
     all.forEach(se => {
       const inWin = new Date(se.date).getTime() >= cutoff;
       let sv = 0;
+      const sessBest = {};   // best e1rm per exercise THIS session — a lift PRs at most once per session (no warm-up ramp inflation)
       Object.keys(se.exercises || {}).forEach(exId => {
         (se.exercises[exId].sets || []).forEach(st => {
           if (!st.done) return;
@@ -213,9 +219,13 @@
           if (inWin) winSets++;
           const e = epley(w, r);
           if (!bestEver[exId] || e > bestEver[exId].e1rm) bestEver[exId] = { exId, weight: w, reps: r, e1rm: e, date: se.date };
-          if (!prMax[exId]) prMax[exId] = e;                                                     // first-ever seeds silently
-          else if (e > prMax[exId] + 0.01) { prMax[exId] = e; prCount++; if (inWin) winPR++; }   // genuine improvement scores
+          if (e > (sessBest[exId] || 0)) sessBest[exId] = e;
         });
+      });
+      Object.keys(sessBest).forEach(exId => {                                                   // score PRs once per lift, on the session's top set
+        const e = sessBest[exId];
+        if (prMax[exId] == null) prMax[exId] = e;                                               // first time you do a lift = baseline, not a PR
+        else if (e > prMax[exId] + 0.01) { prMax[exId] = e; prCount++; if (inWin) winPR++; }    // beating a past session = one genuine PR
       });
       sessionStats.push({ date: se.date, day: se.day, volume: sv, sets: doneSets(se).length });
     });
@@ -652,7 +662,7 @@
             <p class="kicker">Your standing</p>
             <h1 class="rank__tier">Bronze</h1>
             <div class="meter"><span class="meter__fill" style="width:0"></span></div>
-            <p class="rank__pts" style="margin-top:10px">0 points · <b style="color:var(--acc);font-weight:400">300 to Iron</b></p>
+            <p class="rank__pts" style="margin-top:10px">0 points · <b style="color:var(--acc);font-weight:400">400 to Iron</b></p>
             <span class="nh-climb" id="climb">See the climb <span class="nh-chev">›</span></span>
           </div>
         </div>
@@ -918,7 +928,7 @@
         <p class="feel__note">iOS can't wake a web app in the background yet, so this pings you when you open the app on a training day. A true morning alert needs a server — on the roadmap.</p>
       </div>
       <div class="section"><p class="section__title">How Cairn works</p>
-        <p class="feel__note" style="margin-top:10px;line-height:1.6">Your rank is your <b>current form</b> — your last eight weeks of training plus the weight you've dropped. Keep both moving to hold it; stop and it fades, but your peak stays on record. Each logged set is 10 points, a personal best 40, every kilo lost 150, and other movement — runs, sport, yoga, walks — 2 a minute. Strength is the only place personal bests live.</p>
+        <p class="feel__note" style="margin-top:10px;line-height:1.6">Your rank is your <b>current form</b> — your last eight weeks of training plus the weight you've dropped. Keep both moving to hold it; stop and it fades, but your peak stays on record. Each logged set is 10 points, a personal best 40, every kilo lost 100, and other movement — runs, sport, yoga, walks — 2 a minute. Strength is the only place personal bests live.</p>
       </div>
       <div class="section"><p class="section__title">Data</p>
         ${store.lastBackup ? `<p class="feel__note" style="margin-top:8px">Last backup · ${backupAgo(store.lastBackup)}</p>` : ""}
